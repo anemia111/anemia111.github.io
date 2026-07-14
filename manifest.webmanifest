@@ -1,0 +1,1 @@
+{"name":"F1 Race Simulator","short_name":"F1 Simulator","description":"PC-first Formula 1 race control, timing, strategy, and 3D simulation.","start_url":"./","display":"standalone","background_color":"#050607","theme_color":"#050607","lang":"ja","scope":"./","icons":[{"purpose":"any","sizes":"any","src":"favicon.svg","type":"image/svg+xml"}],"id":"./","orientation":"landscape"}
