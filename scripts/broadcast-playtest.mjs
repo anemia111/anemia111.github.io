@@ -1192,10 +1192,14 @@ async function inspectExpansionCatalog(browser) {
     const summaries = catalog.locator('summary')
     if (await summaries.count() !== 6) throw new Error('Expansion catalog missing categories')
     const rowCounts = []
+    const assetCounts = []
     for (let index = 0; index < 6; index++) {
       await summaries.nth(index).click()
       const detail = catalog.locator('details').nth(index)
       rowCounts.push(await detail.locator('table').first().locator('tbody tr').count())
+      assetCounts.push({ machines: await detail.locator('.expansion-machine').count(),
+        courseShapes: await detail.locator('.expansion-course-grid svg').count(),
+        missingShapes: await detail.locator('.expansion-course-unavailable').count() })
       const clipped = await detail.evaluate((element) => element.scrollWidth > element.clientWidth + 1)
       if (clipped) throw new Error('Expansion catalog table overflows at 1280px')
       await summaries.nth(index).click()
@@ -1203,11 +1207,14 @@ async function inspectExpansionCatalog(browser) {
     if (JSON.stringify(rowCounts) !== JSON.stringify([20, 14, 29, 33, 17, 18])) {
       throw new Error(`Expansion catalog incorrect directory counts: ${rowCounts}`)
     }
-    if (!(await catalog.innerText()).includes('未算出')) throw new Error('Uncomputed abilities are not labelled')
+    const expectedAssets = [[1, 1, 0], [3, 6, 0], [15, 6, 0], [6, 14, 3], [8, 8, 0], [9, 8, 0]]
+    if (JSON.stringify(assetCounts.map(({ machines, courseShapes, missingShapes }) => [machines, courseShapes, missingShapes])) !== JSON.stringify(expectedAssets)) {
+      throw new Error(`Expansion machine/course assets missing: ${JSON.stringify(assetCounts)}`)
+    }
     if (!(await catalog.innerText()).includes('レース実行は未対応')) throw new Error('Catalog implies executable series')
     await summaries.first().click()
     await catalog.screenshot({ path: join(artifactDirectory, 'expansion-catalog.png') })
-    return { rowCounts, labelledUnavailable: true, noHorizontalOverflow: true }
+    return { rowCounts, assetCounts, labelledUnavailable: true, noHorizontalOverflow: true }
   } finally {
     await page.close()
   }

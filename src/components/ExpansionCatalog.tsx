@@ -1,13 +1,12 @@
 import { catalogCalendarFor, catalogDriverCategories, catalogDriverId, expansionCatalog,
   expansionSourceById } from '../series/expansionCatalog'
+import { ExpansionAssets } from './ExpansionAssets'
 
 export function ExpansionCatalog() {
   return <section className="expansion-catalog" aria-label="2026追加カテゴリー収録データ">
     <h3>2026 CATEGORY CATALOG</h3>
     <p>公式エントリーと開催コース · 確認日 {expansionCatalog.verifiedOn}。
       追加カテゴリーのレース実行は未対応です。車両物理・競技規則・コース形状の検証後に有効になります。</p>
-    <p>能力基準：複数カテゴリー参戦者を接点にした同条件クリーンラップ比較。
-      比較ラップ未収録のため、追加選手の能力値は未算出です。</p>
     {expansionCatalog.categories.map((category) => {
       const events = catalogCalendarFor(category.id)
       const tracks = [...new Set(events.map((event) => event.trackName))]
@@ -15,6 +14,7 @@ export function ExpansionCatalog() {
       return <details key={category.id}>
         <summary>{category.label} · {category.entries.length} 件 · {tracks.length} コース</summary>
         <p className="expansion-scope">{scope}</p>
+        <ExpansionAssets categoryId={category.id} />
         <p>{category.id.startsWith('wec-') ? 'WECはイモラ暫定エントリー表の収録です。年間全参戦者・ル・マン追加枠は未収録です。' :
           category.id === 'indycar' ? '年間ドライバー一覧です。各大会の同時出走台数や車番の割当とは区別しています。' :
             '公式一覧のスナップショットです。大会ごとの変更は別途確認が必要です。'}</p>

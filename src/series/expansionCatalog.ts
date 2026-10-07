@@ -1,6 +1,5 @@
 import catalogJson from '../data/expansionCatalog2026.json'
 import { driverPool2026, seriesPackages } from './seriesRegistry'
-import type { CrossCategoryRating } from './crossCategoryRatings'
 
 export type CatalogEntry = {
   number: string
@@ -78,9 +77,6 @@ for (const category of expansionCatalog.categories) {
     }
   }
 }
-
-/** Only audited observed laps may populate this; directory entries are not pace evidence. */
-export const expansionDerivedRatings: readonly CrossCategoryRating[] = []
 
 export function catalogCalendarFor(categoryId: string) {
   return expansionCatalog.calendars[categoryId.startsWith('super-gt-') ? 'super-gt' :

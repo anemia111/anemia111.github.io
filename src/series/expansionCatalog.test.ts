@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { catalogCalendarFor, catalogDriverCategories, catalogDriverId, expansionCatalog,
-  expansionDerivedRatings, validateExpansionCatalog } from './expansionCatalog'
+  validateExpansionCatalog } from './expansionCatalog'
 import { EXECUTABLE_SERIES_IDS } from './seriesIds'
 
 describe('source-backed expansion directory', () => {
@@ -36,7 +36,6 @@ describe('source-backed expansion directory', () => {
   })
 
   it('does not turn identities into fabricated performance or executable category packages', () => {
-    expect(expansionDerivedRatings).toEqual([])
     for (const category of expansionCatalog.categories) {
       expect(EXECUTABLE_SERIES_IDS).not.toContain(category.id)
       for (const entry of category.entries) expect(entry).not.toHaveProperty('overall')

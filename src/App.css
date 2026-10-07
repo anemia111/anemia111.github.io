@@ -4045,3 +4045,14 @@
 .expansion-catalog small { display: block; color: #aeb8c6; margin-top: 4px; }
 .expansion-catalog a { color: #86c8ff; text-decoration: underline; }
 .expansion-catalog summary:focus-visible, .expansion-catalog a:focus-visible { outline: 2px solid #86c8ff; outline-offset: 3px; }
+.expansion-assets { margin: 16px 0; }
+.expansion-machine { padding: 12px; margin: 8px 0; border: 1px solid #3a414d; border-radius: 6px; }
+.expansion-machine h5 { margin: 0 0 8px; font-size: 14px; }
+.expansion-machine dl { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 5px 12px; }
+.expansion-machine dt { color: #aab3c2; }
+.expansion-machine dd { margin: 0; overflow-wrap: anywhere; }
+.expansion-course-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.expansion-course-grid figure { margin: 0; padding: 12px; border: 1px solid #3a414d; border-radius: 6px; }
+.expansion-course-grid svg { display: block; width: 100%; height: 180px; color: #75d8c2; }
+.expansion-course-grid figcaption > * { display: block; margin-top: 5px; }
+.expansion-course-unavailable { min-height: 180px; display: grid; place-content: center; color: #aab3c2; }
