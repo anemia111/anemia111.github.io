@@ -24,6 +24,7 @@ describe('additional category Free Mode', () => {
     draft.entries = resizeFreeField(draft.entries,100)
     expect(new Set(draft.entries.map(entry=>entry.id)).size).toBe(100)
     const first = buildFreeRace(draft,'random',true,null)
+    expect(first.eventId).toBe(`free:${draft.championship}:${draft.course.id}`)
     expect(buildFreeRace(draft,'random',true,null)).toEqual(first)
     for (const classId of ['gt500','gt300']) {
       const machines = first.entries.filter(entry=>entry.classId===classId).map(entry=>entry.machine)

@@ -54,8 +54,10 @@ export function matchingQualifying(config: MotorsportRaceConfig, result: Motorsp
 export function buildFreeRace(draft: MotorsportRaceConfig, grid: FreeGrid, equalCars: boolean, qualifying: MotorsportQualifyingResult | null): MotorsportRaceConfig {
   const config = structuredClone(draft)
   config.applicationMode = 'free'
+  config.eventId = `free:${config.championship}:${config.course.id}`
   config.freeSettings = {grid,equalCars}
   validateMotorsportConfig(config)
+  if (config.format.kind === 'laps' ? config.format.laps > 1000 : config.format.seconds > 86400) throw new Error('Free Mode supports up to 1000 laps or 24 hours')
   if (config.entries.some(entry=>!/^\d{1,6}$/.test(entry.number))) throw new Error('Car numbers must contain 1–6 digits')
   if (new Set(config.entries.map(entry => `${entry.classId}:${entry.number}`)).size !== config.entries.length) throw new Error('Car numbers must be unique within each class')
   if (!config.seed.trim() || config.seed.length > 128) throw new Error('Seed must contain 1–128 characters')
