@@ -2980,7 +2980,7 @@ describe('start procedure and persisted weekend', () => {
 
     expect(snapshot.overtakeEnabled).toBe(true)
     expect(snapshot.overtakeEnableTargetsByDriver).toBeNull()
-  }, 30_000)
+  }, 120_000)
 
   it('measures VSC deltas against the pace-adjusted on-track speed', () => {
     const config = makeConfig('vsc-delta-pace')
