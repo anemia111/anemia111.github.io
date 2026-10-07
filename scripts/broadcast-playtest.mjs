@@ -1401,7 +1401,7 @@ try {
 
   const expectedCars = { 'f1-custom': 22, 'super-formula': 24 }
   const seriesFailures = []
-  if (seriesModes.seriesOptions.join(',') !== 'f1-custom,super-formula') {
+  if (seriesModes.seriesOptions.join(',') !== 'f1-custom,super-formula,motorsport:kyojo,motorsport:super-gt,motorsport:wec,motorsport:indycar') {
     seriesFailures.push(`series selector is incomplete: ${seriesModes.seriesOptions.join(', ')}`)
   }
   for (const [seriesId, carCount] of Object.entries(expectedCars)) {

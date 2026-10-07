@@ -73,6 +73,21 @@ describe('car and crew motorsport race runtime', () => {
     expect(red.cars[0].driverSeconds).toEqual(yellow.cars[0].driverSeconds)
     expect(red.cars[0].distanceM).toBe(yellow.cars[0].distanceM)
   })
+  it('finishes a short mixed-class race and accepts a finish-line crossing in the pit lane', () => {
+    const original = createMotorsportConfig('super-gt')
+    const config = { ...original, format: { kind: 'laps' as const, laps: 1, basis: 'Short SIM check' } }
+    let state = createMotorsportRace(config)
+    for (let tick = 0; tick < 20000 && state.phase !== 'finished'; tick += 1000) state = advanceMotorsportRace(state, 1000, config)
+    expect(state.phase).toBe('finished')
+    expect(state.cars.every(car => car.status === 'finished')).toBe(true)
+    const single = { ...config, entries: config.entries.slice(0, 1) }
+    let pitting = createMotorsportRace(single)
+    pitting = { ...pitting, phase: 'racing', raceSeconds: 100, cars: [{ ...pitting.cars[0], status: 'pit-exit', distanceM: single.course.lengthM - 0.1, pitPathM: 450, speedMps: 60 / 3.6 }] }
+    pitting = advanceMotorsportRace(pitting, 1, single)
+    expect(pitting.phase).toBe('finished')
+    expect(pitting.winnerId).toBe(single.entries[0].id)
+  })
+
   it('performs a real pit transit, sequential WEC fuel/tyre work and crew change', () => {
     const base = racing('wec')
     const config = { ...base.config, entries: base.config.entries.slice(0, 1) }

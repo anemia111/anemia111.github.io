@@ -58,10 +58,6 @@ export function MotorsportApp({ onBack, initialChampionship = 'kyojo' }: { onBac
     return () => { runtime?.terminate(); worker.current = null }
   }, [])
   useEffect(() => {
-    generation.current++; busy.current = false; debt.current = 0
-    worker.current?.postMessage({ type: 'init', generation: generation.current, config, state: latest.current.state } satisfies MotorsportWorkerCommand)
-  }, [config])
-  useEffect(() => {
     let lastTime = performance.now()
     const timer = window.setInterval(() => {
       const now = performance.now(), elapsed = Math.min(0.2, Math.max(0, (now - lastTime) / 1000)); lastTime = now
@@ -85,6 +81,8 @@ export function MotorsportApp({ onBack, initialChampionship = 'kyojo' }: { onBac
   }, [])
   const reset = (nextConfig: MotorsportRaceConfig) => {
     const nextState = createMotorsportRace(nextConfig)
+    generation.current++; busy.current = false; debt.current = 0
+    worker.current?.postMessage({ type: 'init', generation: generation.current, config: nextConfig, state: nextState } satisfies MotorsportWorkerCommand)
     latest.current = { ...latest.current, config: nextConfig, state: nextState, paused: true }
     setPaused(true); setConfig(nextConfig); setState(nextState); setClassFilter('all')
     setSelectedId(nextConfig.entries[0].id); setNextDriver(null); setMessage('')
@@ -128,7 +126,7 @@ export function MotorsportApp({ onBack, initialChampionship = 'kyojo' }: { onBac
       <label>天候<select aria-label="Motorsport weather" value={config.weather} disabled={!paused} onChange={event => reset({ ...config, weather: event.target.value as 'dry' | 'wet' })}><option value="dry">ドライ</option><option value="wet">ウェット</option></select></label>
       <select aria-label="Motorsport race director flag" value={state.flag} onChange={event => flag(event.target.value as MotorsportRaceState['flag'])}>{['green', 'yellow', 'fcy', 'sc', 'red'].map(value => <option key={value} value={value}>{value.toUpperCase()}</option>)}</select>
       <button onClick={exportSave}>JSON保存</button>
-      <label className="motorsport-import">保存を読込<input aria-label="Import motorsport race" type="file" accept=".json" onChange={async event => { const file = event.target.files?.[0]; if (!file) return; if (file.size > 4_000_000) { setMessage('保存ファイルが大きすぎます。'); event.target.value = ''; return } const save = parseMotorsportSave(await file.text()); if (!save) { setMessage('保存データの形式・整合性を確認できません。'); return } latest.current = { ...latest.current, ...save, paused: true }; setPaused(true); setConfig(save.config); setState(save.state); setSelectedId(save.config.entries[0].id); setClassFilter('all'); setNextDriver(null); setMessage(''); event.target.value = '' }} /></label>
+      <label className="motorsport-import">保存を読込<input aria-label="Import motorsport race" type="file" accept=".json" onChange={async event => { const file = event.target.files?.[0]; if (!file) return; if (file.size > 4_000_000) { setMessage('保存ファイルが大きすぎます。'); event.target.value = ''; return } const save = parseMotorsportSave(await file.text()); if (!save) { setMessage('保存データの形式・整合性を確認できません。'); return } generation.current++; busy.current = false; debt.current = 0; worker.current?.postMessage({ type: 'init', generation: generation.current, config: save.config, state: save.state } satisfies MotorsportWorkerCommand); latest.current = { ...latest.current, ...save, paused: true }; setPaused(true); setConfig(save.config); setState(save.state); setSelectedId(save.config.entries[0].id); setClassFilter('all'); setNextDriver(null); setMessage(''); event.target.value = '' }} /></label>
       <strong className={`motorsport-phase flag-${state.flag}`}>{state.phase === 'formation' ? `FORMATION ${clock(state.formationSeconds)}` : state.phase === 'finished' ? 'FINISHED' : state.leaderFinished ? 'CHEQUERED' : state.flag.toUpperCase()} · {clock(state.raceSeconds)}</strong>
     </section>
     {message && <p role="status" className="motorsport-message">{message}</p>}

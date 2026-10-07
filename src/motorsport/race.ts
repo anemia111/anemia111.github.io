@@ -87,7 +87,7 @@ function requestForStrategy(config: MotorsportRaceConfig, entry: MotorsportEntry
   const requiredAlternates = config.course.kind === 'street' || config.course.id === 'nashville' ? 2 : 1
   const missingAlternates = requiredAlternates - car.tyreSets.filter(set => set.compound === 'alternate' && set.completedLaps >= 2).length
   const compoundDue = config.championship === 'indycar' && config.weather === 'dry' && (config.course.kind === 'road' || config.course.kind === 'street' || config.course.id === 'nashville') && config.format.kind === 'laps' && config.format.laps >= 6 && missingAlternates > 0 && car.tyreSets.at(-1)!.completedLaps >= 2 && config.format.laps - car.laps <= missingAlternates * 4 + 2
-  const gtShareDue = config.championship === 'super-gt' && (config.format.kind === 'laps'
+  const gtShareDue = config.championship === 'super-gt' && (config.format.kind !== 'laps' || config.format.laps >= 6) && (config.format.kind === 'laps'
     ? car.driverDistanceM[car.driverIndex] >= Math.max(0, config.format.laps * 2 / 3 - 2) * config.course.lengthM
     : car.driverSeconds[car.driverIndex] >= config.format.seconds * 2 / 3 - 180)
   const windowDue = config.championship === 'wec' && config.course.id === 'le-mans' && drivingTimeInWindow(car, car.driverIndex, car.activeDrivingEnd - 21600, car.activeDrivingEnd) >= 14220
@@ -340,7 +340,7 @@ function advanceTick(previous: MotorsportRaceState, config: MotorsportRaceConfig
       const lapTime = crossing - car.lapStartedAt
       car.lastLapSeconds = lapTime; car.bestLapSeconds = Math.min(car.bestLapSeconds ?? Infinity, lapTime)
       car.lapStartedAt = crossing; car.laps = completedAfter
-      if (car.status === 'running') crossings.push({ entryId: car.entryId, time: crossing, laps: completedAfter })
+      if (RUNNING.has(car.status)) crossings.push({ entryId: car.entryId, time: crossing, laps: completedAfter })
     }
     return car
   })

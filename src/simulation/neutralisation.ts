@@ -6,6 +6,7 @@ import type {
 } from '../types'
 import { carCanDefineNeutralisationQueue } from './incidentTraffic'
 import { hashChance } from './random'
+import { profileDistanceKmBetween } from './trackDynamics'
 
 const SAFETY_CAR_JOIN_SIGNAL_SECONDS = 2
 /**
@@ -248,7 +249,7 @@ export function isSafetyCarFieldQueued(
   cars: CarSnapshot[],
   referenceLapTimeSeconds: number,
   maximumQueueGapCarLengths: 10 | 20 = 10,
-  trackLengthMeters?: number,
+  trackGeometry?: TrackDefinition | number,
 ) {
   const running = runningOnTrackCars(cars)
 
@@ -259,6 +260,7 @@ export function isSafetyCarFieldQueued(
   // Ten car lengths are a physical distance, not a fraction of the live
   // projected lap time. Under SC that lap time grows and the old threshold
   // could become shorter than the following controller's safe gap.
+  const trackLengthMeters = typeof trackGeometry === 'number' ? trackGeometry : trackGeometry ? trackGeometry.lengthKm * 1000 : undefined
   const maximumGapLaps = trackLengthMeters && trackLengthMeters > 0
     ? maximumQueueGapCarLengths * 5.6 / trackLengthMeters
     : (SAFETY_CAR_QUEUE_GAP_SECONDS * (maximumQueueGapCarLengths / 10)) /
@@ -269,7 +271,9 @@ export function isSafetyCarFieldQueued(
     const rawGap = Math.max(0, ahead.totalDistance - car.totalDistance)
     const physicalGapLaps = rawGap - Math.floor(rawGap)
 
-    return physicalGapLaps <= maximumGapLaps
+    return typeof trackGeometry === 'object'
+      ? profileDistanceKmBetween(trackGeometry, car.totalDistance, car.totalDistance + physicalGapLaps) * 1000 <= maximumQueueGapCarLengths * 5.6
+      : physicalGapLaps <= maximumGapLaps
   })
 }
 
@@ -882,7 +886,7 @@ function advanceSafetyCar(
       cars,
       leader.projectedLapTime,
       procedure.maximumQueueGapCarLengths,
-      track.lengthKm * 1000,
+      track,
     )
   ) {
     procedure = {

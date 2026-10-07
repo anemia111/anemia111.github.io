@@ -30,7 +30,14 @@ try {
       await page.getByRole('spinbutton', { name: 'Motorsport race distance', exact: true }).fill('1')
       await page.getByRole('combobox', { name: 'Motorsport simulation speed', exact: true }).selectOption('600')
       await page.getByRole('button', { name: '走行開始', exact: true }).click()
-      await page.waitForFunction(() => document.querySelector('.motorsport-phase')?.textContent?.includes('FINISHED'), null, { timeout: 30_000 })
+      console.log(`[motorsport-playtest] ${championship} ${viewport.width}: started`)
+      try {
+        await page.waitForFunction(() => document.querySelector('.motorsport-phase')?.textContent?.includes('FINISHED'), null, { timeout: 60_000 })
+      } catch (error) {
+        console.log(JSON.stringify({ championship, viewport, errors, text: (await page.locator('body').innerText()).slice(0, 7000) }))
+        await page.screenshot({ path: join(artifacts, `motorsport-failure-${championship}-${viewport.width}.png`), fullPage: true })
+        throw error
+      }
       assert.ok(!(await rows.allTextContents()).every(text => text.includes('retired')), `${championship}: no finishers`)
       const layout = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, width: innerWidth }))
       assert.ok(layout.scrollWidth <= layout.width + 1, `${championship}: horizontal page overflow`)
