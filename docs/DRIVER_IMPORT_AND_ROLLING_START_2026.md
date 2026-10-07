@@ -50,8 +50,13 @@ checkpoints were rejected on resume.
 
 The related ten-file suite passed 133 tests before the final transmission
 refinement; the final rolling-start, catalog and blue-flag suite passed all
-12 tests. Lint and the production build passed. The driver UI playtest has
-confirmed the 348-person list, KYOJO search and imported Overall 77.
+12 tests, and the vehicle/course asset suite passed five tests. Lint and the
+production build passed. The normal desktop playtest passed at 1440x900 and
+1280x720, including the 348-person list, KYOJO search, imported Overall 77 and
+40-car Free Mode. After adjusting the source-note layout, a focused browser
+check confirmed that the note stays inside its column and career history stays
+30 px high at both sizes. Monte Carlo passed all six tests on an isolated rerun;
+one earlier concurrent run exceeded its unchanged 5-second test limit.
 
 `npm run publish` stopped at an existing track-surface assertion:
 `counts only moving on-track traversals, excluding pit and excursion cars`.
