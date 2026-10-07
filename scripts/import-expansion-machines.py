@@ -54,7 +54,7 @@ def import_gt(item):
                          "wheelbase": numeric(rows["ホイールベース"], "mm"),
                          "displacement": numeric(rows["排気量"], "cc"),
                          "power": numeric(power, "PS", "lower-bound" if "以上" in power else "published"),
-                         "gears": numeric("6", "count"), "engine": rows["エンジン型式"],
+                         "gears": numeric("資料に記載なし", "count"), "engine": rows["エンジン型式"],
                          "architecture": rows["仕様"], "enginePosition": rows["エンジン搭載位置"],
                          "notes": "基本諸元。BoP・サクセスウェイト・燃料流量制限を反映した大会別の実効性能ではありません。"})
     if not machines:

@@ -482,10 +482,10 @@
         "text": "−"
       },
       "gears": {
-        "value": 6.0,
+        "value": null,
         "unit": "count",
-        "relation": "published",
-        "text": "6"
+        "relation": "unavailable",
+        "text": "資料に記載なし"
       },
       "engine": "16A",
       "architecture": "水冷V型8気筒 ツインターボ",
@@ -539,10 +539,10 @@
         "text": "−"
       },
       "gears": {
-        "value": 6.0,
+        "value": null,
         "unit": "count",
-        "relation": "published",
-        "text": "6"
+        "relation": "unavailable",
+        "text": "資料に記載なし"
       },
       "engine": "P58 EVO",
       "architecture": "水冷直列6気筒 シングルターボ",
@@ -596,10 +596,10 @@
         "text": "600ps以上"
       },
       "gears": {
-        "value": 6.0,
+        "value": null,
         "unit": "count",
-        "relation": "published",
-        "text": "6"
+        "relation": "unavailable",
+        "text": "資料に記載なし"
       },
       "engine": "F163CE",
       "architecture": "水冷V型6気筒 ツインターボ",
@@ -653,10 +653,10 @@
         "text": "−"
       },
       "gears": {
-        "value": 6.0,
+        "value": null,
         "unit": "count",
-        "relation": "published",
-        "text": "6"
+        "relation": "unavailable",
+        "text": "資料に記載なし"
       },
       "engine": "DGF",
       "architecture": "水冷V型10気筒 自然吸気",
@@ -710,10 +710,10 @@
         "text": "−"
       },
       "gears": {
-        "value": 6.0,
+        "value": null,
         "unit": "count",
-        "relation": "published",
-        "text": "6"
+        "relation": "unavailable",
+        "text": "資料に記載なし"
       },
       "engine": "2UR-G",
       "architecture": "水冷V型8気筒 自然吸気",
@@ -767,10 +767,10 @@
         "text": "−"
       },
       "gears": {
-        "value": 6.0,
+        "value": null,
         "unit": "count",
-        "relation": "published",
-        "text": "6"
+        "relation": "unavailable",
+        "text": "資料に記載なし"
       },
       "engine": "2UR-G",
       "architecture": "水冷V型8気筒 自然吸気＋ハイブリッド",
@@ -824,10 +824,10 @@
         "text": "500ps以上"
       },
       "gears": {
-        "value": 6.0,
+        "value": null,
         "unit": "count",
-        "relation": "published",
-        "text": "6"
+        "relation": "unavailable",
+        "text": "資料に記載なし"
       },
       "engine": "2UR-GSE",
       "architecture": "水冷V型8気筒 自然吸気",
@@ -881,10 +881,10 @@
         "text": "550ps以上"
       },
       "gears": {
-        "value": 6.0,
+        "value": null,
         "unit": "count",
-        "relation": "published",
-        "text": "6"
+        "relation": "unavailable",
+        "text": "資料に記載なし"
       },
       "engine": "M159",
       "architecture": "水冷V型8気筒 自然吸気",
@@ -938,10 +938,10 @@
         "text": "550ps以上"
       },
       "gears": {
-        "value": 6.0,
+        "value": null,
         "unit": "count",
-        "relation": "published",
-        "text": "6"
+        "relation": "unavailable",
+        "text": "資料に記載なし"
       },
       "engine": "VR38DETT",
       "architecture": "水冷V型6気筒 ツインターボ",
@@ -995,10 +995,10 @@
         "text": "−"
       },
       "gears": {
-        "value": 6.0,
+        "value": null,
         "unit": "count",
-        "relation": "published",
-        "text": "6"
+        "relation": "unavailable",
+        "text": "資料に記載なし"
       },
       "engine": "VR38DETT",
       "architecture": "水冷V型6気筒 ツインターボ",
@@ -1052,10 +1052,10 @@
         "text": "565ps"
       },
       "gears": {
-        "value": 6.0,
+        "value": null,
         "unit": "count",
-        "relation": "published",
-        "text": "6"
+        "relation": "unavailable",
+        "text": "資料に記載なし"
       },
       "engine": "MA187",
       "architecture": "水冷水平対向6気筒 自然吸気",
@@ -1109,10 +1109,10 @@
         "text": "500ps以上/7000rpm"
       },
       "gears": {
-        "value": 6.0,
+        "value": null,
         "unit": "count",
-        "relation": "published",
-        "text": "6"
+        "relation": "unavailable",
+        "text": "資料に記載なし"
       },
       "engine": "EG33",
       "architecture": "水平対向6気筒ツインターボ",
@@ -1166,10 +1166,10 @@
         "text": "−"
       },
       "gears": {
-        "value": 6.0,
+        "value": null,
         "unit": "count",
-        "relation": "published",
-        "text": "6"
+        "relation": "unavailable",
+        "text": "資料に記載なし"
       },
       "engine": "GTA",
       "architecture": "水冷V型8気筒 自然吸気",
@@ -1223,10 +1223,10 @@
         "text": "−"
       },
       "gears": {
-        "value": 6.0,
+        "value": null,
         "unit": "count",
-        "relation": "published",
-        "text": "6"
+        "relation": "unavailable",
+        "text": "資料に記載なし"
       },
       "engine": "2UR-G",
       "architecture": "水冷V型8気筒 自然吸気",
@@ -1280,10 +1280,10 @@
         "text": "−"
       },
       "gears": {
-        "value": 6.0,
+        "value": null,
         "unit": "count",
-        "relation": "published",
-        "text": "6"
+        "relation": "unavailable",
+        "text": "資料に記載なし"
       },
       "engine": "2UR-G",
       "architecture": "水冷V型8気筒 自然吸気",
@@ -1337,10 +1337,10 @@
         "text": "550ps以上"
       },
       "gears": {
-        "value": 6.0,
+        "value": null,
         "unit": "count",
-        "relation": "published",
-        "text": "6"
+        "relation": "unavailable",
+        "text": "資料に記載なし"
       },
       "engine": "HR-420E",
       "architecture": "水冷直列4気筒直噴シングルターボ",
@@ -1394,10 +1394,10 @@
         "text": "550ps以上"
       },
       "gears": {
-        "value": 6.0,
+        "value": null,
         "unit": "count",
-        "relation": "published",
-        "text": "6"
+        "relation": "unavailable",
+        "text": "資料に記載なし"
       },
       "engine": "NR4S26",
       "architecture": "水冷直列4気筒直噴シングルターボ",
@@ -1451,10 +1451,10 @@
         "text": "550ps以上"
       },
       "gears": {
-        "value": 6.0,
+        "value": null,
         "unit": "count",
-        "relation": "published",
-        "text": "6"
+        "relation": "unavailable",
+        "text": "資料に記載なし"
       },
       "engine": "RI4BG",
       "architecture": "水冷直列4気筒直噴シングルターボ",
@@ -1607,7 +1607,7 @@
     {
       "id": "toyota-tr010-2026",
       "url": "https://toyota-racing.com/toyota-racing-wec/",
-      "sha256": "b4545b7a97f5a8d539e88645d0cc1a062b2905846f8928c7fcb12a93d98484bd",
+      "sha256": "4e5e77e3e1e60e572fa09d6994d9613ffd3eb7b97064528fdd25ccf16327e400",
       "scope": "2026 TR010 technical specifications; weight/power subject to BoP",
       "verifiedOn": "2026-10-07"
     }

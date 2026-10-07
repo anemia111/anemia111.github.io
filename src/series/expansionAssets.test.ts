@@ -10,7 +10,10 @@ describe('2026 machine and physical course assets', () => {
     for (const category of ['super-gt-gt500', 'super-gt-gt300']) {
       const assets = machineAssetsFor(category)
       expect(assets).toHaveLength(category.endsWith('gt500') ? 3 : 15)
-      for (const asset of assets) expect(asset).not.toHaveProperty('specificationUnavailable')
+      for (const asset of assets) {
+        expect(asset).not.toHaveProperty('specificationUnavailable')
+        if (!('specificationUnavailable' in asset)) expect(asset.gears.value).toBeNull()
+      }
     }
     const supra500 = expansionMachineSpecifications.find((m) => m.name === 'TOYOTA GR Supra GT500')!
     const supra300 = expansionMachineSpecifications.find((m) => m.name === 'TOYOTA GR Supra')!
