@@ -115,7 +115,8 @@ export function MotorsportApp({ onBack, initialChampionship = 'kyojo' }: { onBac
   const track = useMemo(() => dashboardCourse(config), [config])
   const {snapshot, timingRows, sceneConfig} = useMemo(() => dashboardFrame(config, state, track), [config, state, track])
   const selectedCar = snapshot.cars.find(car => car.driverId === selected.entry.id) ?? snapshot.cars[0]
-  const label = motorsportChampionships.find(item => item.id === config.championship)!.label
+  const label = { kyojo: 'KYOJO CUP', 'super-gt': 'SUPER GT', wec: 'FIA WEC', indycar: 'INDYCAR' }[config.championship]
+  const focusDriver = (id: string) => { setSelectedId(id); setNextDriver(null) }
   const tyreUsage = <div className="tyre-usage-content"><div className="tyre-usage-legend">{['primary','alternate','wet'].map(compound => <div key={compound}><span>{compound.toUpperCase()}</span><strong>{state.cars.filter(car => car.tyreSets.at(-1)?.compound === compound).length}</strong><small>SIM</small></div>)}</div></div>
   return <div className="race-shell" data-testid="motorsport-app">
     <BroadcastDashboard
@@ -124,8 +125,8 @@ export function MotorsportApp({ onBack, initialChampionship = 'kyojo' }: { onBac
       dataMode="SIM" dataModeAvailability={{SIM:true,HIST:false,LIVE:false}} engineLabel="SIM"
       environment={{airLabel:'—',trackLabel:'—',humidityLabel:'—',pressureLabel:'—',windLabel:'—',rainLabel:config.weather,source:'SIM'}}
       eventName={config.course.name} isPaused={paused} onCameraModeChange={setCameraMode} onDataModeChange={() => {}}
-      onFocusDriver={id => {setSelectedId(id);setNextDriver(null)}}
-      onExitFreeMode={() => setPanel('setup')} onOpenFreeMode={() => setPanel('setup')}
+      onFocusDriver={focusDriver}
+      onExitFreeMode={() => {}} onOpenFreeMode={() => {}}
       onOpenClassification={() => setPanel('classification')} onOpenInsights={() => setPanel('pit')} onOpenPitWall={() => setPanel('pit')} onOpenSetup={() => setPanel('setup')}
       onPauseChange={() => {if(state.phase !== 'finished') setPaused(value => !value)}}
       onSeriesChange={onBack} onOpenMotorsport={changeEvent}
@@ -137,7 +138,7 @@ export function MotorsportApp({ onBack, initialChampionship = 'kyojo' }: { onBac
       seriesOptions={seriesPackages.map(item => ({id:item.id,label:item.label}))}
       tireLabels={{S:'Not available',M:'Not available',H:'Not available',I:'Not available',W:'Not available'}} timingRows={timingRows} track={track}
       categoryPresentation={{seriesValue:`motorsport:${config.championship}`,systemsLabel:'SIM',tyreUsage,tyreLegend:<span>{config.weather.toUpperCase()} · SIM TYRES</span>,speeds:[1,5,20,60,600]}}
-      trackScene={<Suspense fallback={<div className="scene-loading">Loading circuit map...</div>}><RaceScene cameraMode={cameraMode} config={sceneConfig} onSelectDriver={setSelectedId} openF1Overlay={null} openF1OverlayMode="SIM" selectedDriverId={selected.entry.id} snapshot={snapshot}/></Suspense>}
+      trackScene={<Suspense fallback={<div className="scene-loading">Loading circuit map...</div>}><RaceScene cameraMode={cameraMode} config={sceneConfig} onSelectDriver={focusDriver} openF1Overlay={null} openF1OverlayMode="SIM" selectedDriverId={selected.entry.id} snapshot={snapshot}/></Suspense>}
       weekendStages={['race']}
     />
     {message && <p role="status" className="motorsport-message">{message}</p>}

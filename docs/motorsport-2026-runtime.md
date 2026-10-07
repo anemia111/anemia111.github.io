@@ -30,7 +30,7 @@ PDFを大会ごとに取り込む。2人クルーと3人クルーを区別する
 
 追加カテゴリーも既存のBroadcastDashboardとRaceSceneを共用する。ヘッダー、左順位表、
 中央コース、下部操作バーの配置を維持し、大会・距離・保存設定は既存のSettings入口に収める。
-給油・交代はPIT WALLから開く。SUPER GTはGT500/GT300、WECはHypercar/LMGT3
+給油・交代はPIT WALLから開く。既存F1/SFのFree Modeはそのまま利用でき、追加カテゴリーでは未対応のFree Mode操作を無効化する。SUPER GTはGT500/GT300、WECはHypercar/LMGT3
 （ル・マンはLMP2も）の独立した順位表を左エリア内に表示し、クラス順位・クラス内ギャップを使う。
 
 ## 走行と操作

@@ -837,6 +837,8 @@ export function BroadcastDashboard({
             </button>
             <button
               aria-pressed={applicationMode === 'free'}
+              disabled={Boolean(categoryPresentation)}
+              title={categoryPresentation ? 'Free Mode: F1 / SUPER FORMULA' : undefined}
               onClick={onOpenFreeMode}
               type="button"
             >
