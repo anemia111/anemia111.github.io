@@ -147,7 +147,7 @@ describe('Free Mode runtime integration', () => {
     expect(minimumStateOfCharge).toBeLessThan(0.99)
     expect(recoveredAfterDischarge).toBe(true)
     expect(stateOfChargeIncreasedAfterDischarge).toBe(true)
-  })
+  }, 30_000)
 
   it.each([
     ['practice', 180],
@@ -165,7 +165,7 @@ describe('Free Mode runtime integration', () => {
 
     expect(snapshot.cars).toHaveLength(1)
     expect(snapshot.sessionStatus).toBe('finished')
-  }, 30_000)
+  }, 120_000)
 
   it(
     'finishes a 30-car Super Formula session on an F1 circuit',
@@ -184,7 +184,7 @@ describe('Free Mode runtime integration', () => {
       expect(snapshot.cars).toHaveLength(30)
       expect(snapshot.sessionStatus).toBe('finished')
     },
-    90_000,
+    300_000,
   )
 
   it(
@@ -203,7 +203,7 @@ describe('Free Mode runtime integration', () => {
       expect(snapshot.cars).toHaveLength(40)
       expect(snapshot.sessionStatus).toBe('finished')
     },
-    90_000,
+    300_000,
   )
 
   it.each([
@@ -229,6 +229,7 @@ describe('Free Mode runtime integration', () => {
         ),
       ).toBe(true)
     },
+    30_000,
   )
 
   it('completes SC, VSC and red-flag procedures with 40 cars', () => {

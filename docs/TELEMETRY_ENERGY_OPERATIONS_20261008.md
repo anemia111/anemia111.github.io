@@ -2,7 +2,7 @@
 
 The existing dashboard, FREE builder and category classification remain the entry points. Analysis now includes two-car distance-aligned speed, throttle, brake and gear traces. Corner tables show sampled entry/minimum/exit speed within ±2.5% of course length. These are simulation outputs, not measured driver inputs or official corner speed targets. Additional-category corner markers identify modeled curvature minima, not official turn numbers.
 
-History retains at most 256 spatial samples per lap over the current and two previous laps. Missing intervals remain blank. Fast-forward uses physics ticks. Additional-category saves compact sample tuples and restore older saves without inventing historical data.
+History retains at most 256 spatial samples per lap over the current and two previous laps. Missing intervals remain blank. Fast-forward uses physics ticks. Native and additional-category checkpoints use a versioned base-36 trace encoding, lossless at recorder precision, to retain the existing browser storage budget. Older object-based traces and additional-category tuples remain readable. SF checkpoint validation accepts only the course-specific OTS specification and bounded remaining/cooldown state. No historical data is invented.
 
 ## Category systems and evidence boundaries
 

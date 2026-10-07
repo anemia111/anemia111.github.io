@@ -635,7 +635,7 @@ export function calculateCarTelemetry(options: {
           throttlePercent,
         },
         path: driverDecisionPath,
-        seriesId,
+        seriesId: seriesId ?? (categoryPhysics.id === 'super-formula' ? 'super-formula' : undefined),
         vehicleEraId,
       })
     : false

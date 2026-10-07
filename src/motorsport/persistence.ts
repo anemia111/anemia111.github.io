@@ -1,3 +1,4 @@
+import { encodeTelemetryHistory, decodeTelemetryHistory } from '../simulation/telemetryHistory'
 import { motorsportMachine } from './packages'
 import { validateMotorsportConfig } from './race'
 import type { MotorsportRaceConfig, MotorsportRaceState } from './types'
@@ -18,7 +19,7 @@ function finiteTree(value: unknown, depth = 0): boolean {
   return false
 }
 export function serializeMotorsportSave(config: MotorsportRaceConfig, state: MotorsportRaceState): string {
-  const payload = JSON.stringify({ schemaVersion: 1, config, state } satisfies MotorsportSave,(key,value)=>key==='telemetryHistory' && Array.isArray(value)?value.map(point=>[point.lap,point.progress,point.seconds,point.speedKph,point.throttlePercent,point.brakePercent,point.gear,point.rpm]):value)
+  const payload = JSON.stringify({ schemaVersion: 1, config, state } satisfies MotorsportSave,(key,value)=>key==='telemetryHistory' && Array.isArray(value)?encodeTelemetryHistory(value):value)
   return JSON.stringify({ schemaVersion: 1, checksum: checksum(payload), payload })
 }
 export function parseMotorsportSave(raw: string): MotorsportSave | null {
@@ -26,7 +27,7 @@ export function parseMotorsportSave(raw: string): MotorsportSave | null {
     if (raw.length > 16_000_000) return null
     const envelope = JSON.parse(raw) as { schemaVersion?: number; checksum?: string; payload?: string }
     if (envelope.schemaVersion !== 1 || typeof envelope.payload !== 'string' || checksum(envelope.payload) !== envelope.checksum) return null
-    const save = JSON.parse(envelope.payload) as MotorsportSave
+    const save = JSON.parse(envelope.payload,(key,value)=>key==='telemetryHistory'?decodeTelemetryHistory(value):value) as MotorsportSave
     if (!finiteTree(save) || save.schemaVersion !== 1 || save.state.schemaVersion !== 1 || save.config.schemaVersion !== 1) return null
     for (const entry of save.config.entries) {
       const current=motorsportMachine(entry.machine.name,entry.classId)
