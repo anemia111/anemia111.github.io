@@ -71,8 +71,10 @@ No third-party requests occur during ordinary client startup.
   against homologation/event documents remains necessary before simulation use.
 - Toyota TR010 reference mass/power depend on BoP. The 200 kW front motor is not
   added to the listed 520 kW to invent a 720 kW racing output.
-- KC-MG01's 635 kg is manufacturer vehicle weight; driver/fuel inclusion remains
-  unconfirmed. Its aero and tyre curves have not been measured.
+- KC-MG01's 635 kg is manufacturer vehicle weight; model-year applicability and
+  driver/fuel inclusion remain unconfirmed. The 2026 race report confirms removal
+  of the hybrid system; the manufacturer's reference must not be treated as a
+  verified 2026 non-hybrid race mass. Its aero and tyre curves are unmeasured.
 - OSM lengths are compared with the cited published course lengths with a 4%
   rejection tolerance. This is an import sanity check, not a precision claim.
   Public-road centerlines, oval racing lines and survey quality cause differences.

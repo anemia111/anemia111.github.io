@@ -986,6 +986,8 @@ export type RaceConfig = {
   freeMode?: boolean
   /** Category identity keeps checkpoints and category-specific assists isolated. */
   seriesId?: ExecutableSeriesId
+  /** Initial start format; omission preserves the standing-start rule package. */
+  raceStartMode?: 'standing' | 'rolling'
   vehicleEraId?: RuntimeVehicleEraId
   /** Omission selects the behavior-neutral category agent adapter. */
   driverDecisionPath?: DriverDecisionPath

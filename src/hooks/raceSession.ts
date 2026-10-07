@@ -373,6 +373,7 @@ function authoritativeRechargeRulesFor(
     return [
       resolveF1RechargeRule({
         ...context,
+        allowUnverifiedSessionDefault: config.freeMode === true,
         eventId: config.eventId ?? undefined,
         eventInput: config.fiaPuEventInput,
         stage: config.weekendStage ?? 'race',

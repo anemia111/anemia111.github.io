@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { catalogCalendarFor, catalogDriverCategories, catalogDriverId, expansionCatalog,
-  validateExpansionCatalog } from './expansionCatalog'
+  validateExpansionCatalog, catalogPoolDriverById } from './expansionCatalog'
 import { EXECUTABLE_SERIES_IDS } from './seriesIds'
 
 describe('source-backed expansion directory', () => {
@@ -40,5 +40,14 @@ describe('source-backed expansion directory', () => {
       expect(EXECUTABLE_SERIES_IDS).not.toContain(category.id)
       for (const entry of category.entries) expect(entry).not.toHaveProperty('overall')
     }
+  })
+
+  it('connects all twenty KYOJO registrations to imported pool abilities', () => {
+    const kyojo = expansionCatalog.categories.find((category) => category.id === 'kyojo')!
+    for (const entry of kyojo.entries) {
+      expect(catalogPoolDriverById.get(catalogDriverId(entry.drivers[0]))).toBeDefined()
+    }
+    expect(catalogPoolDriverById.get(catalogDriverId('塚越 広大'))?.name).toBe('Koudai Tsukakoshi')
+    expect(catalogDriverId('Alexander LYNN')).toBe(catalogDriverId('Alex Lynn'))
   })
 })

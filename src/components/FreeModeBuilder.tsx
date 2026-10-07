@@ -75,6 +75,12 @@ const historySeriesLabels = {
   f3: 'F3 history',
   'super-formula': 'SF history',
   external: 'External history',
+  kyojo: 'KYOJO CUP history',
+  'super-gt-gt500': 'SUPER GT GT500 history',
+  'super-gt-gt300': 'SUPER GT GT300 history',
+  indycar: 'INDYCAR history',
+  'wec-hypercar': 'WEC Hypercar history',
+  'wec-lmgt3': 'WEC LMGT3 history',
 } as const
 
 const sessionLabels = {
@@ -719,6 +725,14 @@ export function FreeModeBuilder({
         </header>
 
         <div className="free-mode-settings">
+          <label>
+            <span>Race start (SIM)</span>
+            <select aria-label="Race start mode" value={configuration.raceStartMode ?? 'standing'}
+              onChange={(event) => setConfiguration((current) => ({ ...current,
+                raceStartMode: event.target.value as 'standing' | 'rolling' }))}>
+              <option value="standing">Standing</option><option value="rolling">Rolling</option>
+            </select>
+          </label>
           <label>
             <span>Category</span>
             <select

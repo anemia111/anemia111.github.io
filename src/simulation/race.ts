@@ -690,6 +690,8 @@ export function formationLapsPlannedFor(config: RaceConfig) {
     return hashChance(`${config.seed}:sc-start-extra-lap`) < 0.32 ? 3 : 2
   }
 
+  if (config.raceStartMode === 'rolling') return 1
+
   const abortedStart =
     hashChance(`${config.seed}:aborted-start`) <
     (weather === 'clear' ? 0.025 : 0.06)
@@ -2633,7 +2635,7 @@ export function createInitialRace(config: RaceConfig = phaseOneConfig): RaceSnap
   const initialTimedSegment = config.timedSessionPlan?.segments[0] ?? null
   const startProcedure = isRaceDistance ? 'formation' : 'racing'
   const startLightSequenceSeconds =
-    isRaceDistance && !formationBehindSafetyCar
+    isRaceDistance && !formationBehindSafetyCar && config.raceStartMode !== 'rolling'
       ? startLightSequenceSecondsFor(config.seed)
       : 0
   const f1WeekendContext =
@@ -3015,7 +3017,9 @@ export function createInitialRace(config: RaceConfig = phaseOneConfig): RaceSnap
     eventMessage: isRaceDistance
       ? formationBehindSafetyCar
         ? `FORMATION LAP(S) BEHIND SAFETY CAR${wetWeatherTyresMandatory ? ' - WET WEATHER TYRES MUST BE USED' : ''}.`
-        : `Formation lap begins. ${formationLapsPlanned > 1 ? 'An additional formation lap is scheduled after an aborted start.' : 'Cars will complete a full circuit before returning to the grid.'}`
+        : config.raceStartMode === 'rolling'
+          ? 'Rolling-start formation lap. The field remains moving until green at the Line.'
+          : `Formation lap begins. ${formationLapsPlanned > 1 ? 'An additional formation lap is scheduled after an aborted start.' : 'Cars will complete a full circuit before returning to the grid.'}`
       : startMessage,
     flag: formationBehindSafetyCar ? 'sc' : 'clear',
     flagLabel: formationBehindSafetyCar ? 'SC FORMATION' : 'CLEAR',
@@ -3424,7 +3428,20 @@ export function advanceRace(
   }
 
   if (isRaceDistance && snapshot.startProcedure !== 'racing') {
-    const startLightSequenceSeconds = snapshot.formationBehindSafetyCar
+    const rollingStart = config.raceStartMode === 'rolling'
+    const movingStart = snapshot.formationBehindSafetyCar || rollingStart
+    const rollingSpeedKph = Math.min(190, Math.max(75,
+      config.track.lengthKm / Math.max(1, snapshot.formationLapDurationSeconds) * 3600))
+    const rollingPowerUnit = rollingStart ? selectGear({
+      clutchEngagementFraction: 1,
+      combustionPowerKw: categoryPhysics.combustionPowerKw,
+      deploymentPowerKw: 0,
+      physics: categoryPhysics,
+      speedMps: rollingSpeedKph / 3.6,
+      transmissionEfficiency: categoryPhysics.drivetrainEfficiency,
+      turboSpoolFraction: 1,
+    }) : null
+    const startLightSequenceSeconds = movingStart
       ? 0
       : (snapshot.startLightSequenceSeconds ??
         startLightSequenceSecondsFor(config.seed))
@@ -3432,13 +3449,13 @@ export function advanceRace(
       snapshot.formationLapDurationSeconds * snapshot.formationLapsPlanned
     const gridStartsAt = totalFormationSeconds
     const lightsStartAt = gridStartsAt + GRID_SETTLE_SECONDS
-    const raceStartsAt = snapshot.formationBehindSafetyCar
+    const raceStartsAt = movingStart
       ? gridStartsAt
       : lightsStartAt + startLightSequenceSeconds
     const nextProcedure =
       elapsedSeconds < gridStartsAt
         ? 'formation'
-        : snapshot.formationBehindSafetyCar
+        : movingStart
           ? 'racing'
         : elapsedSeconds < lightsStartAt
           ? 'grid'
@@ -3476,8 +3493,10 @@ export function advanceRace(
           ? 'Cars return to their starting-grid slots.'
           : nextProcedure === 'lights'
             ? 'Start procedure: five red lights.'
-            : snapshot.formationBehindSafetyCar
-              ? `ROLLING START. Safety Car in; green flag at the Line.`
+            : movingStart
+              ? snapshot.formationBehindSafetyCar
+                ? 'ROLLING START. Safety Car in; green flag at the Line.'
+                : `ROLLING START. Green flag at the Line; ${raceLaps} racing laps.`
               : `Lights out! ${raceLaps} laps at ${config.track.name}.`
 
     if (nextProcedure !== snapshot.startProcedure) {
@@ -3583,7 +3602,7 @@ export function advanceRace(
         hashChance(`${config.seed}:low-power-start:${driver.id}`) <
           0.004 + Math.max(0, 70 - weakestCondition) * 0.0005
       const standingStartMguKReleaseLatched = f1Runtime
-        ? car.startsFromPitLane || snapshot.formationBehindSafetyCar
+        ? car.startsFromPitLane || movingStart
           ? true
           : raceStartTriggered
             ? false
@@ -3647,7 +3666,7 @@ export function advanceRace(
             config.teams,
             car.teamId,
           ),
-          pitUntilSeconds: lightsOut
+          pitUntilSeconds: lightsOut || (rollingStart && raceStartTriggered)
             ? elapsedSeconds + Math.max(6, baseLapTime * 0.14)
             : null,
           speedKph: 0,
@@ -3694,8 +3713,11 @@ export function advanceRace(
       const stagedDistance =
         nextProcedure === 'formation'
           ? formationDistance
-          : snapshot.formationBehindSafetyCar && nextProcedure === 'racing'
-            ? formationDistance
+          : movingStart && nextProcedure === 'racing'
+            // Dry rolling formation is not a racing lap. Remove the completed
+            // integer lap only from the race ledger; physical progress is unchanged.
+            ? formationDistance - (rollingStart && !snapshot.formationBehindSafetyCar
+                ? snapshot.formationLapsPlanned : 0)
           : startingGridDistance(index, config.track.lengthKm * 1000)
       const stagedLap = Math.floor(stagedDistance)
       return {
@@ -3708,19 +3730,19 @@ export function advanceRace(
             ? 72
             : nextProcedure === 'formation'
               ? 18
-              : snapshot.formationBehindSafetyCar
+              : movingStart
                 ? 8
                 : 20,
         rpm:
-          nextProcedure === 'lights' || lightsOut
+          rollingPowerUnit ? Math.round(rollingPowerUnit.rpm) : nextProcedure === 'lights' || lightsOut
             ? Math.round(lightsRpm)
             : nextProcedure === 'formation'
               ? 6200
-              : snapshot.formationBehindSafetyCar
+              : movingStart
                 ? 9200
                 : 0,
         gear:
-          nextProcedure === 'lights' || lightsOut ? 1 : car.gear,
+          rollingPowerUnit?.gear ?? (nextProcedure === 'lights' || lightsOut ? 1 : car.gear),
         speedKph:
           nextProcedure === 'formation'
             ? Math.round(
@@ -3734,8 +3756,10 @@ export function advanceRace(
                   ),
                 ),
               )
-            : snapshot.formationBehindSafetyCar && nextProcedure === 'racing'
-              ? 145
+            : movingStart && nextProcedure === 'racing'
+              ? rollingStart
+                ? rollingSpeedKph
+                : 145
             : lightsOut
               ? 0
               : 0,
@@ -3744,14 +3768,14 @@ export function advanceRace(
             ? 36
             : nextProcedure === 'formation'
               ? 42
-              : snapshot.formationBehindSafetyCar
+              : movingStart
                 ? 58
                 : lightsOut
                   ? Math.round(52 + launchExecution * 24)
                   : 0,
         turboSpoolFraction: stagedTurboSpoolFraction,
         clutchEngagementFraction:
-          nextProcedure === 'lights' || lightsOut
+          rollingStart ? 1 : nextProcedure === 'lights' || lightsOut
             ? 0
             : car.clutchEngagementFraction,
         brakeTemperatureC: Math.min(

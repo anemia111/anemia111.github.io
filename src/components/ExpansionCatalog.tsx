@@ -1,5 +1,5 @@
 import { catalogCalendarFor, catalogDriverCategories, catalogDriverId, expansionCatalog,
-  expansionSourceById } from '../series/expansionCatalog'
+  expansionSourceById, catalogPoolDriverById } from '../series/expansionCatalog'
 import { ExpansionAssets } from './ExpansionAssets'
 
 export function ExpansionCatalog() {
@@ -26,8 +26,10 @@ export function ExpansionCatalog() {
               {entry.machine ?? '車種未検証'}</a><small>{entry.team ?? 'チーム未確認'}</small>
               <small>{entry.tyreSupplier ?? entry.engine ?? ''}</small></td>
             <td>{entry.drivers.map((name) => {
-              const categories = [...(catalogDriverCategories.get(catalogDriverId(name)) ?? [])]
-              return <div key={name}>{name}{categories.length > 1 &&
+              const id = catalogDriverId(name)
+              const driver = catalogPoolDriverById.get(id)
+              const categories = [...(catalogDriverCategories.get(id) ?? [])]
+              return <div key={name}>{name}<small>{driver ? `SIM能力 ${driver.overall} · 選手プール登録済み` : '能力表との対応未確認'}</small>{categories.length > 1 &&
                 <small title={categories.join(' / ')}>共通選手：{categories.join(' / ')}</small>}</div>
             })}</td>
           </tr>)}</tbody>

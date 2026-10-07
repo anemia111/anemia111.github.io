@@ -92,7 +92,7 @@ def main():
                      "displacement": numeric("1400", "cc", "rounded"),
                      "power": numeric("176", "bhp"), "gears": numeric("6", "count"),
                      "engine": "1.4 L turbo", "architecture": "1.4Lターボ", "enginePosition": None,
-                     "notes": "KCMG公表の車両重量。ドライバー・燃料の算入条件は未確認。空力・タイヤ特性は未校正。"})
+                     "notes": "KCMG公表の参考車両重量。適用年式とドライバー・燃料の算入条件は未確認。2026年はハイブリッド撤去のため、この値を2026年実戦重量とは扱わない。空力・タイヤ特性は未校正。"})
     sources.append({"id": "kcmg-kc-mg01", "url": kcmg_url,
                     "sha256": hashlib.sha256(raw).hexdigest(), "scope": "KC-MG01 manufacturer specification"})
     indy_url = "https://honda.racing/ja/indy-car-series/machines/car-specifications-26"
