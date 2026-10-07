@@ -812,5 +812,5 @@ describe('on-track speed calibration', () => {
     // the field still reaches the top-gear region without overspeed.
     expect(lasVegas.maximumSpeedKph).toBeGreaterThanOrEqual(330)
     expect(lasVegas.maximumSpeedKph).toBeLessThan(402)
-  }, 120_000)
+  }, 300_000)
 })

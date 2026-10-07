@@ -27,6 +27,10 @@ describe('telemetry and SF OTS checkpoint compatibility',()=>{
     const now=Date.now(),raw=serializeRaceCheckpoint('ots',snapshot,now)!
     const restored=parseRaceCheckpoint(raw,'ots',config,now)?.cars[0].runtimeSystems
     expect(restored?.kind==='super-formula' && restored.otsSimulation).toEqual(spent)
+    const legacy=JSON.parse(raw)
+    delete legacy.snapshot.cars[0].runtimeSystems.otsSimulation
+    const migrated=parseRaceCheckpoint(JSON.stringify(legacy),'ots',config,now)?.cars[0].runtimeSystems
+    expect(migrated?.kind==='super-formula' && migrated.otsSimulation?.remainingSeconds).toBe(200)
     for(const patch of [{remainingSeconds:201},{boostPowerKw:999},{cooldownSeconds:1}]){
       const altered=JSON.parse(raw);Object.assign(altered.snapshot.cars[0].runtimeSystems.otsSimulation,patch)
       expect(parseRaceCheckpoint(JSON.stringify(altered),'ots',config,now)).toBeNull()

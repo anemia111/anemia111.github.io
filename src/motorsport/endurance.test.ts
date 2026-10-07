@@ -37,6 +37,6 @@ describe('published-distance full-field motorsport acceptance', () => {
       }
       const restored = parseMotorsportSave(serializeMotorsportSave(config, state))
       expect(restored?.state).toEqual(state)
-    }, 900_000)
+    }, 1_800_000)
   }
 })

@@ -1326,6 +1326,14 @@ function migrateRaceSnapshot(
 
       return {
         ...car,
+        runtimeSystems:
+          car.runtimeSystems.kind === 'super-formula' &&
+          car.runtimeSystems.otsSimulation === undefined
+            ? {
+                ...car.runtimeSystems,
+                otsSimulation: createSfOtsSimulation(config.track.id),
+              }
+            : car.runtimeSystems,
         desiredLateralOffsetM,
         driverAgentRuntime:
           car.driverAgentRuntime ??

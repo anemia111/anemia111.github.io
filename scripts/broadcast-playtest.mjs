@@ -565,19 +565,12 @@ async function runViewport(browser, name, viewport, screenshotPath) {
   await enabledBoxCommand.click()
   await page.getByRole('button', { name: '60x' }).click()
   let pitWallBoxApplied = false
-  for (let sample = 0; sample < 140; sample += 1) {
-    await page.waitForTimeout(150)
-    const stops = Number(
-      await page
-        .locator('.leaderboard-rows li.selected .leaderboard-stops')
-        .innerText(),
-    )
-
-    if (Number.isFinite(stops) && stops > selectedStopsBefore) {
-      pitWallBoxApplied = true
-      break
-    }
-  }
+  try {
+    // A command still has to complete a real lap and pit passage. Concurrent
+    // physics validation can make 60x take longer than the old 21s wall budget.
+    await page.waitForFunction((before) => Number(document.querySelector('.leaderboard-rows li.selected .leaderboard-stops')?.textContent)>before, selectedStopsBefore, {timeout:90_000,polling:250})
+    pitWallBoxApplied = true
+  } catch { /* Preserve the failed-command assertion and full UI report below. */ }
   await page.getByRole('button', { name: '1x' }).click()
 
   const pitWallLayout = await page.evaluate(() => {

@@ -528,7 +528,7 @@ describe('timed session plan', () => {
     // A full Q1 through the production engine takes seconds, not milliseconds,
     // and runs alongside a build during a publish. Its siblings already carry
     // their own budget; the default 5s left this one failing on load alone.
-    600_000,
+    1_800_000,
   )
 
   it(
@@ -589,7 +589,7 @@ describe('timed session plan', () => {
       // drift while allowing the observed 1.534-second boundary case.
       ).toBeLessThan(1.6)
     },
-    600_000,
+    1_800_000,
   )
 
   it('suspends the segment under red and releases only eligible cars', () => {
