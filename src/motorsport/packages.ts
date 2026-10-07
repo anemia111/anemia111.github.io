@@ -40,6 +40,7 @@ export function motorsportMachine(name: string, classId: MotorsportClass, engine
   const mass = reference(spec, 'mass', base.mass)
   const isOval = kind === 'speedway' || kind === 'short-oval'
   const hybridReference = (spec as MachineSpecification & { hybridPowerKw?: number } | undefined)?.hybridPowerKw
+  const lmdh = classId === 'hypercar' && /963|V-Series|ARX-06|M Hybrid|A424|GMR-001/i.test(name)
   const hybridPower = hybridReference ?? (classId === 'hypercar' && !/Valkyrie/i.test(name) ? /Toyota|499P|9X8/i.test(name) ? 200 : 50 : classId === 'indycar' ? 44.74 : 0)
   return {
     id: `${classId}:${name}:${classId === 'indycar' ? configuration : ''}`, name: spec?.name ?? name, classId,
@@ -48,7 +49,9 @@ export function motorsportMachine(name: string, classId: MotorsportClass, engine
     dragAreaM2: simulatedValue(classId === 'indycar' && isOval ? kind === 'speedway' ? 0.56 : 0.74 : base.drag),
     liftAreaM2: simulatedValue(classId === 'indycar' && isOval ? kind === 'speedway' ? 1.4 : 1.8 : base.lift),
     tyreMu: simulatedValue(classId === 'indycar' && isOval ? kind === 'speedway' ? 1.45 : 1.4 : base.mu), fuelCapacityKg: simulatedValue(base.fuel, classId === 'lmp2' ? 'WEC 2026 D12: maximum 75L; SIM density 0.75kg/L converts volume to fuel mass, not measured batch density' : undefined), fuelKgPerKm: simulatedValue(base.consumption),
-    hybridPowerKw: hybridReference === undefined ? simulatedValue(hybridPower) : { value: hybridPower, basis: 'manufacturer-reference', source: machineSpecificationSources.get(spec!.sourceId)?.url ?? spec!.sourceId }, hybridCapacityMj: simulatedValue(hybridPower === 0 ? 0 : classId === 'indycar' ? 0.32 : 4),
+    hybridPowerKw: hybridReference === undefined ? simulatedValue(hybridPower) : { value: hybridPower, basis: 'manufacturer-reference', source: machineSpecificationSources.get(spec!.sourceId)?.url ?? spec!.sourceId }, hybridCapacityMj: lmdh ? {value:4.86,basis:'manufacturer-reference',source:'https://newsroom.porsche.com/en_US/2025/company/porsche-963-rsp-39683.html · common LMDh 1.35 kWh battery'} : simulatedValue(hybridPower === 0 ? 0 : classId === 'indycar' ? 0.32 : 4),
+    hybridRecoveryPowerKw: lmdh ? {value:200,basis:'manufacturer-reference',source:'https://www.bosch.fr/actualites/2026/24h-du-mans/'} : simulatedValue(hybridPower),
+    hybridMinimumSpeedKph: simulatedValue(classId==='hypercar' && !lmdh && hybridPower>0 ? 190 : 0,'SIM deployment gate; 190 km/h LMH manufacturer reference, exact 2026 event BoP must override'),
     virtualEnergyCapacityMj: classId === 'hypercar' || classId === 'lmgt3' ? simulatedValue(classId === 'hypercar' ? 900 : 700, 'SIM stint-energy reference; event BoP must replace this value') : null,
     notes: [spec?.notes ?? 'Individual technical specification is unavailable; class SIM references are explicit.',
       'Aero, tyre, fuel consumption and energy maps are simulation estimates. Reference output is not an event BoP.',

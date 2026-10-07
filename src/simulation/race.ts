@@ -129,6 +129,8 @@ import { startingGridDistance, startingGridLateralOffsetM } from './startingGrid
 import { f1StandingStartMguKDecision } from './f1StandingStart'
 import { calculateCarTelemetry } from './telemetry'
 import { followingDemand } from './following'
+import { recordTelemetry } from './telemetryHistory'
+import { advanceSfOts, createSfOtsSimulation } from './sfOtsRuntime'
 import {
   categoryPhysicsFor,
   resolveOperationalVehicleMass,
@@ -169,6 +171,7 @@ import {
   referenceProfileLapTimeSeconds,
   speedForProfileTravelKph,
   trackDynamicsAt,
+  profileDistanceKmBetween,
 } from './trackDynamics'
 import { trackWidthMeters } from './physicalLap'
 import {
@@ -2820,7 +2823,7 @@ export function createInitialRace(config: RaceConfig = phaseOneConfig): RaceSnap
             ),
             tires: f1Tires!,
           }
-        : createSuperFormulaRuntimeSystems({
+        : { ...createSuperFormulaRuntimeSystems({
             entrantId: team.id,
             engineLedger:
               superFormulaWeekendContext?.engineLedgerByEntrant[team.id],
@@ -2832,7 +2835,7 @@ export function createInitialRace(config: RaceConfig = phaseOneConfig): RaceSnap
               superFormulaWeekendContext?.controlTireInventoryByDriver[
                 driver.id
               ],
-          })
+          }), otsSimulation: createSfOtsSimulation(config.track.id) }
 
     const car: CarSnapshot = {
       driverId: driver.id,
@@ -4327,8 +4330,8 @@ export function advanceRace(
   const deferredBattleEffects = new Map<string, DeferredBattleEffect>()
   const deferredTimedGridPenalties = new Map<string, number>()
   const teamsPittingThisFrame = new Set<string>()
-  let timedPitExitAvailableAt = elapsedSeconds
   const timedPitExitGapSeconds = isPracticeStage(weekendStage) ? 2.4 : 1.35
+  let timedPitExitAvailableAt = Math.max(elapsedSeconds, ...snapshot.cars.filter(car=>car.pitPhase==='exit' && car.pitExitUntilSeconds!==null).map(car=>car.pitExitUntilSeconds! - PIT_EXIT_VISUAL_SECONDS + timedPitExitGapSeconds))
   let stewardCases = [...(snapshot.stewardCases ?? [])]
 
   // During a red-flag suspension the field gathers for the restart, so the
@@ -5588,7 +5591,7 @@ export function advanceRace(
       }
 
       if (car.pitUntilSeconds !== null && elapsedSeconds >= car.pitUntilSeconds) {
-        if (isTimedSession) {
+        if (isTimedSession || car.status === 'pit') {
           const releaseAtSeconds = Math.max(
             car.pitUntilSeconds,
             timedPitExitAvailableAt,
@@ -6654,6 +6657,14 @@ export function advanceRace(
       })
     }
 
+    // The exit blend lane cannot be used as a passing lane. Compare physical
+    // neighbours, including different racing laps, rather than classification.
+    if (car.pitPhase === 'exit' && physicalAhead) {
+      const gapLaps=((physicalAhead.totalDistance-car.totalDistance)%1+1)%1
+      const projectedAhead=progressForProfileSpeed(config.track,car.totalDistance+gapLaps,physicalAhead.speedKph,deltaSeconds)
+      totalDistance=distanceRespectingLocalYellowOrder({aheadProjectedDistance:projectedAhead,currentDistance:car.totalDistance,projectedDistance:totalDistance,referenceSpeedKph:Math.max(5,displayTelemetry.speedKph),trackLengthMeters:config.track.lengthKm*1000})
+    }
+
     // No overtaking in the SC/VSC queue: hold a minimum spacing behind the
     // car ahead (ignoring cars in the pit lane or already finished).
     if (
@@ -6695,7 +6706,7 @@ export function advanceRace(
       combustionPowerKwFor(team, categoryPhysics) +
         (config.overtakeSystem === 'ots' &&
         displayTelemetry.overtakeStatus === 'active'
-          ? (categoryPhysics.overtakeBoostPowerKw ?? 0)
+          ? (car.runtimeSystems.kind === 'super-formula' ? car.runtimeSystems.otsSimulation?.boostPowerKw ?? categoryPhysics.overtakeBoostPowerKw ?? 0 : categoryPhysics.overtakeBoostPowerKw ?? 0)
           : 0)
     const powerUnitExplicitlyStopped =
       localControlPhase?.flag === 'red' || car.pitPhase === 'box'
@@ -7488,6 +7499,7 @@ export function advanceRace(
               : undefined
           const { causedYellow, trackLimitDeleted } =
             liveTimedLapAdjudication({
+              obstructed: next.incidentTrackState !== 'clear',
               completedTimedLap,
               driverId: driver.id,
               seed: config.seed,
@@ -8839,7 +8851,7 @@ export function advanceRace(
             combustionPowerKwFor(team, categoryPhysics) +
               (config.overtakeSystem === 'ots' &&
               car.overtakeStatus === 'active'
-                ? (categoryPhysics.overtakeBoostPowerKw ?? 0)
+                ? (car.runtimeSystems.kind === 'super-formula' ? car.runtimeSystems.otsSimulation?.boostPowerKw ?? categoryPhysics.overtakeBoostPowerKw ?? 0 : categoryPhysics.overtakeBoostPowerKw ?? 0)
                 : 0),
           deploymentPowerKw:
             car.runtimeSystems.kind === 'f1'
@@ -9363,7 +9375,10 @@ export function advanceRace(
     overtakeEnabled,
     overtakeEnableAtLeaderDistance,
     overtakeEnableTargetsByDriver,
-    cars: classifiedCars,
+    cars: classifiedCars.map(car => {
+      if (car.runtimeSystems.kind==='super-formula' && car.runtimeSystems.otsSimulation && (car.status!=='running' || car.pitPhase!=='none' || nextFlag!=='clear')) car={...car,overtakeStatus:'disabled',runtimeSystems:{...car.runtimeSystems,otsSimulation:advanceSfOts(car.runtimeSystems.otsSimulation,false,false,elapsedSeconds,0)}}
+      return car.status === 'running' && car.pitPhase === 'none' ? { ...car, telemetryHistory: recordTelemetry(car.telemetryHistory, { lap: Math.floor(car.totalDistance), progress: profileDistanceKmBetween(config.track, 0, car.progress)/config.track.lengthKm, seconds: elapsedSeconds, speedKph: car.speedKph, throttlePercent: car.throttlePercent, brakePercent: car.brakePercent, gear: car.gear, rpm: car.rpm }) } : car
+    }),
     eventMessage: '',
     flag: nextFlag,
     flagLabel: timedSessionState.suspended

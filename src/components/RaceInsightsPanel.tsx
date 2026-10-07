@@ -1,3 +1,5 @@
+import { profileDistanceKmBetween } from '../simulation/trackDynamics'
+import { TelemetryComparison } from './TelemetryComparison'
 import { Activity, BarChart3, Flag, Gauge, Route, X } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { usePitStrategyOutlook } from '../hooks/usePitStrategyOutlook'
@@ -190,6 +192,11 @@ export function RaceInsightsPanel({
         </>}
       </div>
 
+      <TelemetryComparison selectedId={car.driverId} lengthM={track.lengthKm*1000} traces={snapshot.cars.map(item=>({id:item.driverId,name:`#${item.carNumber} ${item.driverName}`,color:item.teamColor,samples:item.telemetryHistory ?? []}))} corners={(track.corners ?? []).map(corner=>{
+        let nearest=0, distance=Infinity
+        track.centerline.forEach((point,index)=>{const value=Math.hypot(point[0]-corner.position[0],point[2]-corner.position[2]);if(value<distance){distance=value;nearest=index}})
+        return {label:`T${corner.number}`,progress:profileDistanceKmBetween(track,0,nearest/track.centerline.length)/track.lengthKm}
+      })}/>
       <section className="insight-section">
         <h2><Gauge aria-hidden="true" size={13} /> Tyres & surface</h2>
         {f1Runtime && tireCondition ? (

@@ -1,3 +1,4 @@
+import { motorsportMachine } from './packages'
 import { validateMotorsportConfig } from './race'
 import type { MotorsportRaceConfig, MotorsportRaceState } from './types'
 
@@ -17,16 +18,22 @@ function finiteTree(value: unknown, depth = 0): boolean {
   return false
 }
 export function serializeMotorsportSave(config: MotorsportRaceConfig, state: MotorsportRaceState): string {
-  const payload = JSON.stringify({ schemaVersion: 1, config, state } satisfies MotorsportSave)
+  const payload = JSON.stringify({ schemaVersion: 1, config, state } satisfies MotorsportSave,(key,value)=>key==='telemetryHistory' && Array.isArray(value)?value.map(point=>[point.lap,point.progress,point.seconds,point.speedKph,point.throttlePercent,point.brakePercent,point.gear,point.rpm]):value)
   return JSON.stringify({ schemaVersion: 1, checksum: checksum(payload), payload })
 }
 export function parseMotorsportSave(raw: string): MotorsportSave | null {
   try {
-    if (raw.length > 4_000_000) return null
+    if (raw.length > 16_000_000) return null
     const envelope = JSON.parse(raw) as { schemaVersion?: number; checksum?: string; payload?: string }
     if (envelope.schemaVersion !== 1 || typeof envelope.payload !== 'string' || checksum(envelope.payload) !== envelope.checksum) return null
     const save = JSON.parse(envelope.payload) as MotorsportSave
     if (!finiteTree(save) || save.schemaVersion !== 1 || save.state.schemaVersion !== 1 || save.config.schemaVersion !== 1) return null
+    for (const entry of save.config.entries) {
+      const current=motorsportMachine(entry.machine.name,entry.classId)
+      entry.machine.hybridRecoveryPowerKw ??= current.hybridRecoveryPowerKw
+      entry.machine.hybridMinimumSpeedKph ??= current.hybridMinimumSpeedKph
+      if(entry.machine.hybridCapacityMj.basis==='simulation' && entry.machine.hybridCapacityMj.value===4 && current.hybridCapacityMj.basis==='manufacturer-reference') entry.machine.hybridCapacityMj=current.hybridCapacityMj
+    }
     validateMotorsportConfig(save.config)
     if (save.config.applicationMode !== undefined && !['championship','free'].includes(save.config.applicationMode)) return null
     if (save.config.freeSettings !== undefined && (!['manual','random','qualifying-result'].includes(save.config.freeSettings.grid) || typeof save.config.freeSettings.equalCars !== 'boolean')) return null
@@ -37,6 +44,11 @@ export function parseMotorsportSave(raw: string): MotorsportSave | null {
     if (!Array.isArray(save.state.events) || save.state.events.length > 500 || save.state.events.some(event => !Number.isSafeInteger(event.tick) || !Number.isFinite(event.seconds) || typeof event.message !== 'string' || (event.entryId !== null && !save.config.entries.some(entry => entry.id === event.entryId)))) return null
     if (save.state.cars.length !== save.config.entries.length || new Set(save.state.cars.map(car => car.entryId)).size !== save.state.cars.length) return null
     for (const car of save.state.cars) {
+      if (car.telemetryHistory !== undefined) {
+        if (!Array.isArray(car.telemetryHistory) || car.telemetryHistory.length>768) return null
+        car.telemetryHistory = car.telemetryHistory.map(point=>Array.isArray(point)?{lap:point[0],progress:point[1],seconds:point[2],speedKph:point[3],throttlePercent:point[4],brakePercent:point[5],gear:point[6],rpm:point[7]}:point)
+        if(car.telemetryHistory.some(point=>![point.lap,point.progress,point.seconds,point.speedKph,point.throttlePercent,point.brakePercent,point.gear,point.rpm].every(Number.isFinite) || point.progress<0 || point.progress>=1 || point.speedKph<0 || point.throttlePercent<0 || point.throttlePercent>100 || point.brakePercent<0 || point.brakePercent>100)) return null
+      }
       if (car.paceMode !== undefined && !['push','standard','save','defend'].includes(car.paceMode)) return null
       if (car.lapInvalid !== undefined && typeof car.lapInvalid !== 'boolean') return null
       if (car.lapHistory !== undefined && (!Array.isArray(car.lapHistory) || car.lapHistory.length > 1000 || car.lapHistory.some(lap => !Number.isSafeInteger(lap.lap) || lap.lap < 1 || !Number.isFinite(lap.seconds) || lap.seconds <= 0 || !Number.isInteger(lap.driverIndex) || lap.driverIndex < 0 || typeof lap.compound !== 'string' || typeof lap.pit !== 'boolean'))) return null

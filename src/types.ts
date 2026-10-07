@@ -1254,6 +1254,7 @@ export type EnergyStoreState = {
 }
 
 export type CarSnapshot = {
+  telemetryHistory?: import('./simulation/telemetryHistory').TelemetryPoint[]
   driverId: string
   /** Category mileage plus a bounded replay tail of operational decisions. */
   driverAgentRuntime?: DriverAgentRuntimeState

@@ -1,3 +1,4 @@
+import { advanceSfOts } from './sfOtsRuntime'
 import type {
   ExecutableSeriesId,
   RuntimeVehicleEraId,
@@ -262,12 +263,11 @@ export function calculateCarTelemetry(options: {
       ? resolveSuperFormulaOperational()
       : null
   const superFormulaOts = superFormulaRuntime?.ots
-  // Article 24.3.8 delegates OTS operation to an event source. With no
-  // verified event pack (or no evaluated event conditions), this is false and
-  // the runtime must neither activate OTS nor preserve a legacy allocation.
+  // Keep official event resolution separate from the manufacturer-backed SIM
+  // model. Unknown courses retain the unavailable event-rule boundary.
   const otsRuntimeCanActivate =
-    superFormulaOts?.availability === 'verified-event-rule' &&
-    superFormulaOts.runtimeEligibility.canActivate
+    (superFormulaOts?.availability === 'verified-event-rule' &&
+    superFormulaOts.runtimeEligibility.canActivate) || superFormulaRuntime?.otsSimulation !== undefined
   const operationalVehicleMass =
     options.operationalVehicleMass ??
     resolveOperationalVehicleMass({
@@ -614,6 +614,9 @@ export function calculateCarTelemetry(options: {
     overtakeSystem === 'ots' &&
     otsRuntimeCanActivate &&
     !isPreparationLap &&
+    !lowGripConditions &&
+    (!superFormulaRuntime?.otsSimulation || (superFormulaRuntime.otsSimulation.remainingSeconds > 0 && elapsedSeconds >= superFormulaRuntime.otsSimulation.cooldownUntilSeconds)) &&
+    car.pitPhase === 'none' &&
     sessionType === 'race-distance' &&
     raceControlOvertakeEnabled &&
     !phase &&
@@ -636,7 +639,10 @@ export function calculateCarTelemetry(options: {
         vehicleEraId,
       })
     : false
+  const otsSimulation = superFormulaRuntime?.otsSimulation
+    ? advanceSfOts(superFormulaRuntime.otsSimulation, sfOtsUseRequested, otsAvailable, elapsedSeconds, deltaSeconds) : undefined
   const otsActive = otsAvailable && sfOtsUseRequested
+  const otsUsedSeconds = otsActive ? Math.min(deltaSeconds, superFormulaRuntime?.otsSimulation?.remainingSeconds ?? deltaSeconds) : 0
   const f1ElectricalOvertakeRequest =
     !isPreparationLap &&
     overtakeSystem !== 'ots' &&
@@ -840,9 +846,7 @@ export function calculateCarTelemetry(options: {
         ? intentScheduledDeploymentRequest * 0.72
         : intentScheduledDeploymentRequest
   const extraCombustionPowerKw =
-    otsActive && superFormulaOts?.availability === 'verified-event-rule'
-      ? superFormulaOts.boostPowerKw
-      : 0
+    otsActive ? (superFormulaRuntime?.otsSimulation?.boostPowerKw ?? (superFormulaOts?.availability === 'verified-event-rule' ? superFormulaOts.boostPowerKw : 0)) * (deltaSeconds > 0 ? otsUsedSeconds / deltaSeconds : 0) : 0
   const combustionWheelPowerKw = combustionWheelPowerKwAt({
     categoryPhysics,
     clutchEngagementFraction: car.clutchEngagementFraction,
@@ -1084,7 +1088,7 @@ export function calculateCarTelemetry(options: {
           superClippingStartedAtProgress,
           superClippingStartedAtSeconds,
         }
-      : car.runtimeSystems
+      : superFormulaRuntime && otsSimulation ? { ...superFormulaRuntime, otsSimulation } : car.runtimeSystems
 
   return {
     brakePercent,

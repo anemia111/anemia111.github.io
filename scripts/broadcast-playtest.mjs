@@ -1,3 +1,4 @@
+import assert from 'node:assert/strict'
 import { chromium } from 'playwright'
 import { mkdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -433,6 +434,8 @@ async function runViewport(browser, name, viewport, screenshotPath) {
   await page.getByTitle('Selected driver analysis').click()
   await page.waitForSelector('.insights-panel')
   const insightsVisible = await page.locator('.insights-panel').isVisible()
+  assert.equal(await page.getByLabel('Telemetry comparison').getByRole('img').count(),4)
+  assert.ok(await page.getByLabel('Telemetry comparison car').locator('option').count()>0)
   const strategyControlsVisible = await page.locator('.manual-strategy').isVisible()
   await page.locator('.insights-panel header button').click()
 
@@ -1445,7 +1448,10 @@ try {
         },
         {
           label: 'OTS',
-          required: ['N/A'],
+          required: ['DISABLED', 'SIM'],
+        },
+        { label: 'OTS remaining', required: ['200.0s', 'SIM'] },
+        { label: 'OTS cooldown', required: ['WAIT 0.0s', 'SIM']
         },
         {
           label: 'Refuelling safety',

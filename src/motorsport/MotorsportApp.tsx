@@ -1,3 +1,5 @@
+import { TelemetryComparison } from '../components/TelemetryComparison'
+import { courseStations } from './coursePhysics'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { lazy, Suspense } from 'react'
 import { BroadcastDashboard } from '../components/BroadcastDashboard'
@@ -54,6 +56,15 @@ export function MotorsportApp({ onBack, initialChampionship = 'kyojo', initialFr
   const debt = useRef(0)
   const standings = useMemo(() => motorsportStandings(state, config), [state, config])
   const selected = standings.find(row => row.entry.id === selectedId) ?? standings[0]
+  const telemetryCorners = useMemo(() => {
+    const stations = courseStations(config.course)
+    const candidates = stations.map((station,index)=>({radius:station.radiusM,progress:index/stations.length,index}))
+      .filter(point=>point.radius<250 && point.radius<=stations[(point.index+stations.length-1)%stations.length].radiusM && point.radius<stations[(point.index+1)%stations.length].radiusM)
+      .sort((a,b)=>a.radius-b.radius)
+    const chosen: typeof candidates = []
+    for (const point of candidates) if(chosen.every(other=>Math.min(Math.abs(point.progress-other.progress),1-Math.abs(point.progress-other.progress))>=0.025)) chosen.push(point)
+    return chosen.sort((a,b)=>a.progress-b.progress).map((point,index)=>({label:`C${index+1}`,progress:point.progress}))
+  },[config.course])
   const events = useMemo(() => motorsportEvents(config.championship), [config.championship])
   const courses = useMemo(() => motorsportCourses(config.championship), [config.championship])
   const currentEvent = events.find(event => event.id === config.eventId)
@@ -192,7 +203,7 @@ export function MotorsportApp({ onBack, initialChampionship = 'kyojo', initialFr
     {panel && panel !== 'pit' && <section className={`hud setup-panel motorsport-overlay${panel === 'insights' ? ' insights-panel' : ''}`} role="dialog" aria-label={panel === 'setup' ? 'race setup' : panel === 'insights' ? 'driver analysis' : 'classification'}>
       <div className="setup-header"><h2>{panel === 'setup' ? 'Race setup' : panel === 'insights' ? 'Driver analysis' : 'Classification'}</h2><button className="plain-icon-button" aria-label="Close panel" onClick={() => setPanel(null)}>×</button></div>
       {panel === 'insights' && <label>Selected car<select aria-label="Selected engineering car" value={selected.entry.id} onChange={event=>focusDriver(event.target.value)}>{standings.map(row=><option key={row.entry.id} value={row.entry.id}>#{row.entry.number} {row.entry.drivers[row.car.driverIndex].name} · {row.entry.classId.toUpperCase()}</option>)}</select></label>}
-      {panel === 'insights' && <><h3>#{selected.entry.number} {selected.entry.drivers[selected.car.driverIndex].name}</h3><p>{selected.entry.team} · {selected.entry.machine.name}</p><dl><dt>Class position</dt><dd>{selected.entry.classId.toUpperCase()} P{selected.classPosition}</dd><dt>Last / best lap</dt><dd>{lapTime(selected.car.lastLapSeconds)} / {lapTime(selected.car.bestLapSeconds)}</dd><dt>Speed / gear</dt><dd>{Math.round(selected.car.speedMps*3.6)} km/h / {selected.car.gear}</dd><dt>Fuel / tyre life</dt><dd>{selected.car.fuelKg.toFixed(1)} kg / {Math.round(selected.car.tyreLife*100)}%</dd></dl><h3>Lap log · SIM measured crossings</h3><table><thead><tr><th>Lap</th><th>Time</th><th>Driver</th><th>Tyres</th><th>Lap</th></tr></thead><tbody>{[...(selected.car.lapHistory ?? [])].reverse().map(lap=><tr key={lap.lap}><td>{lap.lap}</td><td>{lapTime(lap.seconds)}</td><td>{selected.entry.drivers[lap.driverIndex]?.name}</td><td>{lap.compound}</td><td>{lap.pit?'OUT / PIT':'TIMED'}</td></tr>)}</tbody></table><h3>Race control</h3>{state.events.filter(event=>event.entryId===null||event.entryId===selected.entry.id).slice(-20).reverse().map((event,index)=><p key={index}>{clock(event.seconds)} · {event.message}</p>)}</>}
+      {panel === 'insights' && <><TelemetryComparison selectedId={selected.entry.id} lengthM={config.course.lengthM} traces={standings.map(row=>({id:row.entry.id,name:`#${row.entry.number} ${row.entry.drivers[row.car.driverIndex].name}`,color:row.entry.color,samples:row.car.telemetryHistory ?? []}))} corners={telemetryCorners}/><h3>#{selected.entry.number} {selected.entry.drivers[selected.car.driverIndex].name}</h3><p>{selected.entry.team} · {selected.entry.machine.name}</p><dl><dt>Class position</dt><dd>{selected.entry.classId.toUpperCase()} P{selected.classPosition}</dd><dt>Last / best lap</dt><dd>{lapTime(selected.car.lastLapSeconds)} / {lapTime(selected.car.bestLapSeconds)}</dd><dt>Speed / gear</dt><dd>{Math.round(selected.car.speedMps*3.6)} km/h / {selected.car.gear}</dd><dt>Fuel / tyre life</dt><dd>{selected.car.fuelKg.toFixed(1)} kg / {Math.round(selected.car.tyreLife*100)}%</dd></dl><h3>Lap log · SIM measured crossings</h3><table><thead><tr><th>Lap</th><th>Time</th><th>Driver</th><th>Tyres</th><th>Lap</th></tr></thead><tbody>{[...(selected.car.lapHistory ?? [])].reverse().map(lap=><tr key={lap.lap}><td>{lap.lap}</td><td>{lapTime(lap.seconds)}</td><td>{selected.entry.drivers[lap.driverIndex]?.name}</td><td>{lap.compound}</td><td>{lap.pit?'OUT / PIT':'TIMED'}</td></tr>)}</tbody></table><h3>Race control</h3>{state.events.filter(event=>event.entryId===null||event.entryId===selected.entry.id).slice(-20).reverse().map((event,index)=><p key={index}>{clock(event.seconds)} · {event.message}</p>)}</>}
       {panel === 'setup' && <>    <header className="motorsport-header">
 
 

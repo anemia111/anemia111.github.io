@@ -419,7 +419,7 @@ function loadPersistedDrivers(series: SeriesPackage): Driver[] {
       (key) => window.localStorage.getItem(key),
     ),
     series.drivers,
-  )
+  ).map(driver=>driver.id==='yuki_nakayama' && Object.values(driver.skills).every(value=>value===1.2) ? {...driver,skills:{...series.drivers.find(person=>person.id===driver.id)!.skills}} : driver)
 }
 
 function loadSeriesConfiguration(
@@ -1025,7 +1025,9 @@ const telemetryForCar = (
               ? '+RDY'
               : ''
         }`
-        : superFormulaRuntime?.ots.availability === 'verified-event-rule'
+        : superFormulaRuntime?.otsSimulation
+          ? `OTS ${car.overtakeStatus.toUpperCase()} ${superFormulaRuntime.otsSimulation.remainingSeconds.toFixed(1)}s`
+          : superFormulaRuntime?.ots.availability === 'verified-event-rule'
           ? 'OTS EVENT RULE'
           : 'OTS N/A',
     batteryPercent: f1Runtime

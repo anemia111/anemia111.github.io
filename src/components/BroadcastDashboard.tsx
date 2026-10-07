@@ -620,6 +620,8 @@ function LeftLeaderboard({
                   >
                     {row.batteryPercent ?? '--'}%
                   </span>
+                ) : row.car.runtimeSystems.otsSimulation ? (
+                  <span title={`OTS ${row.car.overtakeStatus} / ${row.car.runtimeSystems.otsSimulation.remainingSeconds.toFixed(1)}s left / cooldown ${row.car.runtimeSystems.otsSimulation.cooldownSeconds.toFixed(0)}s / SIM boost`}>{row.car.runtimeSystems.otsSimulation.active ? 'ON ' : ''}{row.car.runtimeSystems.otsSimulation.remainingSeconds.toFixed(0)}s</span>
                 ) : row.car.runtimeSystems.ots.availability === 'verified-event-rule' ? (
                   <span
                     title={`Event OTS allocation ${row.car.runtimeSystems.ots.allocationSeconds} seconds; activation condition evaluation is pending`}
@@ -732,7 +734,9 @@ export function BroadcastDashboard({
       ? track.activeAeroUnavailable
         ? `${overtakeLabel} N/A`
         : `${track.aeroActivationZones?.length ?? 0} ${overtakeLabel} ZONES`
-      : selectedCar.runtimeSystems.ots.availability === 'verified-event-rule'
+      : selectedCar.runtimeSystems.otsSimulation
+        ? `OTS ${selectedCar.overtakeStatus.toUpperCase()} / ${selectedCar.runtimeSystems.otsSimulation.remainingSeconds.toFixed(1)}s / WAIT ${Math.max(0,selectedCar.runtimeSystems.otsSimulation.cooldownUntilSeconds-snapshot.elapsedSeconds).toFixed(1)}s`
+        : selectedCar.runtimeSystems.ots.availability === 'verified-event-rule'
         ? 'OTS EVENT RULE / CONDITION PENDING'
         : 'OTS UNAVAILABLE'
   const activeSectorFlagIndex = snapshot.sectorFlags.findIndex(

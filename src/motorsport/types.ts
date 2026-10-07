@@ -14,6 +14,7 @@ export type MotorsportMachine = {
   dragAreaM2: EvidenceValue; liftAreaM2: EvidenceValue; tyreMu: EvidenceValue
   fuelCapacityKg: EvidenceValue; fuelKgPerKm: EvidenceValue
   hybridPowerKw: EvidenceValue; hybridCapacityMj: EvidenceValue
+  hybridRecoveryPowerKw?: EvidenceValue; hybridMinimumSpeedKph?: EvidenceValue
   virtualEnergyCapacityMj: EvidenceValue | null
   notes: string[]
 }
@@ -53,6 +54,9 @@ export type MotorsportPitRequest = {
   entryId: string; fuelFraction: number; changeTyres: boolean; nextDriverIndex: number | null
 }
 export type MotorsportCar = {
+  telemetryHistory?: import('../simulation/telemetryHistory').TelemetryPoint[]
+  throttlePercent?: number; brakePercent?: number; rpm?: number
+  hybridPowerKw?: number; regenerationPowerKw?: number; hybridRecoveredMj?: number
   entryId: string; distanceM: number; speedMps: number; lateralM: number; gear: number
   fuelKg: number; virtualEnergyMj: number | null; hybridEnergyMj: number
   tyreLife: number; tyreTemperatureC: number; driverIndex: number

@@ -1,3 +1,4 @@
+import { recordTelemetry } from '../simulation/telemetryHistory'
 import { clamp, modulo, MOTORSPORT_STEP_SECONDS, targetSpeedMps } from './coursePhysics'
 import type { MotorsportCar, MotorsportEntry, MotorsportPitRequest, MotorsportRaceConfig, MotorsportRaceState } from './types'
 
@@ -25,15 +26,15 @@ export function validateMotorsportConfig(config: MotorsportRaceConfig) {
     if (typeof entry.id !== 'string' || !entry.id || typeof entry.number !== 'string' || typeof entry.team !== 'string' || typeof entry.machine.name !== 'string' || !['kyojo', 'gt500', 'gt300', 'hypercar', 'lmgt3', 'lmp2', 'indycar'].includes(entry.classId) || entry.machine.classId !== entry.classId) throw new Error('Invalid car identity')
     if (!entry.drivers.length || new Set(entry.drivers.map(driver => driver.id)).size !== entry.drivers.length) throw new Error(`Invalid crew for ${entry.id}`)
     for (const driver of entry.drivers) {
-      if (driver.qualifyingPace !== undefined && driver.qualifyingPace !== null && (!Number.isFinite(driver.qualifyingPace) || driver.qualifyingPace < 0 || driver.qualifyingPace > 1)) throw new Error('Invalid qualifying skill')
-      if (typeof driver.id !== 'string' || typeof driver.name !== 'string' || (driver.overall !== null && (!Number.isFinite(driver.overall) || driver.overall < 0 || driver.overall > 100))) throw new Error('Invalid driver')
-      for (const rating of [driver.racePace, driver.consistency, driver.tyreManagement]) if (rating !== null && (!Number.isFinite(rating) || rating < 0 || rating > 1)) throw new Error('Invalid driver skill')
+      if (driver.qualifyingPace !== undefined && driver.qualifyingPace !== null && (!Number.isFinite(driver.qualifyingPace) || driver.qualifyingPace < 0 || driver.qualifyingPace > 1.2)) throw new Error('Invalid qualifying skill')
+      if (typeof driver.id !== 'string' || typeof driver.name !== 'string' || (driver.overall !== null && (!Number.isFinite(driver.overall) || driver.overall < 0 || driver.overall > 120))) throw new Error('Invalid driver')
+      for (const rating of [driver.racePace, driver.consistency, driver.tyreManagement]) if (rating !== null && (!Number.isFinite(rating) || rating < 0 || rating > 1.2)) throw new Error('Invalid driver skill')
     }
     for (const value of [entry.machine.massKg.value, entry.machine.powerKw.value, entry.machine.fuelCapacityKg.value, entry.machine.fuelKgPerKm.value, entry.machine.dragAreaM2.value, entry.machine.tyreMu.value]) {
       if (!(value > 0) || !Number.isFinite(value)) throw new Error(`Invalid physical input for ${entry.id}`)
     }
     if (!Number.isInteger(entry.machine.gears.value) || entry.machine.gears.value < 1 || entry.machine.gears.value > 12) throw new Error('Invalid transmission')
-    for (const value of [entry.machine.driverMassKg.value, entry.machine.liftAreaM2.value, entry.machine.hybridPowerKw.value, entry.machine.hybridCapacityMj.value]) if (!Number.isFinite(value) || value < 0) throw new Error('Invalid physical input')
+    for (const value of [entry.machine.driverMassKg.value, entry.machine.liftAreaM2.value, entry.machine.hybridPowerKw.value, entry.machine.hybridCapacityMj.value, entry.machine.hybridRecoveryPowerKw?.value ?? 0, entry.machine.hybridMinimumSpeedKph?.value ?? 0]) if (!Number.isFinite(value) || value < 0) throw new Error('Invalid physical input')
     if (entry.machine.virtualEnergyCapacityMj !== null && (!Number.isFinite(entry.machine.virtualEnergyCapacityMj.value) || entry.machine.virtualEnergyCapacityMj.value <= 0)) throw new Error('Invalid energy allowance')
   }
 }
@@ -227,6 +228,7 @@ function advanceTick(previous: MotorsportRaceState, config: MotorsportRaceConfig
     const car: MotorsportCar = { ...old, driverSeconds: [...old.driverSeconds], driverLastOutSeconds: [...old.driverLastOutSeconds], driverDistanceM: [...old.driverDistanceM], warnings: [...old.warnings] }
     const entry = entries.get(car.entryId)!, machine = entry.machine, driver = entry.drivers[car.driverIndex]
     const beforeDistance = car.distanceM
+    car.hybridPowerKw = 0; car.regenerationPowerKw = 0
     if (car.status !== 'running') car.lapInvalid = true
     if (car.status !== 'running') {
       car.speedMps = car.status === 'pit-service' ? 0 : config.course.pitSpeedKph.value / 3.6
@@ -257,7 +259,9 @@ function advanceTick(previous: MotorsportRaceState, config: MotorsportRaceConfig
           car.status = 'pit-exit'; car.pitRequest = null; car.stintSeconds = 0
         }
       } else {
-        const step = car.speedMps * dt
+        const pitAhead = previous.cars.filter(other=>other.entryId!==car.entryId && (other.status==='pit-exit' || other.status==='pit-entry') && (other.pitPathM>car.pitPathM || other.pitPathM===car.pitPathM && other.entryId.localeCompare(car.entryId)<0)).sort((a,b)=>a.pitPathM-b.pitPathM)[0]
+        const step = pitAhead ? Math.min(car.speedMps*dt,Math.max(0,pitAhead.pitPathM + pitAhead.speedMps*dt-car.pitPathM-6)) : car.speedMps*dt
+        car.speedMps = step/dt
         car.pitPathM += step
         const pitArc = modulo(config.course.pitExit.value - config.course.pitEntry.value, 1) * length
         car.distanceM += step / config.course.pitLengthM.value * pitArc
@@ -297,10 +301,11 @@ function advanceTick(previous: MotorsportRaceState, config: MotorsportRaceConfig
       const mass = machine.massKg.value + machine.driverMassKg.value + car.fuelKg
       const drag = 0.5 * 1.225 * machine.dragAreaM2.value * car.speedMps ** 2
       let powerKw = machine.powerKw.value
-      const hybrid = state.flag === 'green' && car.speedMps > 25 && target > car.speedMps && car.hybridEnergyMj > 0
+      const hybrid = state.flag === 'green' && car.speedMps*3.6 >= (machine.hybridMinimumSpeedKph?.value ?? 0) && car.speedMps > 5 && target > car.speedMps && car.hybridEnergyMj > 0
         ? Math.min(machine.hybridPowerKw.value, car.hybridEnergyMj * 1000 / dt) : 0
       // Hypercar's electrical contribution remains inside the combined cap.
       if (entry.classId === 'indycar') powerKw += hybrid
+      car.hybridPowerKw = hybrid
       if (overtaking && car.pushToPassSeconds > 0 && entry.classId === 'indycar') {
         powerKw += 45; car.pushToPassSeconds = Math.max(0, car.pushToPassSeconds - dt)
       }
@@ -315,9 +320,11 @@ function advanceTick(previous: MotorsportRaceState, config: MotorsportRaceConfig
       const distanceStep = ahead && state.flag !== 'green'
         ? Math.min(unconstrainedStep, Math.max(0, ahead.gap + ahead.car.speedMps * dt - 6))
         : unconstrainedStep
+      car.throttlePercent = acceleration < -0.1 ? 0 : clamp((mass*Math.max(0,acceleration)+drag+0.015*mass*9.80665)*Math.max(8,car.speedMps)/(powerKw*1000*0.94)*100,0,100)
+      car.brakePercent = acceleration < -0.1 ? clamp(-acceleration/Math.max(0.1,braking)*100,0,100) : 0
       car.speedMps = nextSpeed; car.distanceM += distanceStep
       car.driverDistanceM[car.driverIndex] += distanceStep
-      const fuelUsed = machine.fuelKgPerKm.value * distanceStep / 1000 * (acceleration < -1 ? 0.35 : 0.85 + 0.15 * Math.min(1, Math.max(0, acceleration) / 4)) * (car.paceMode === 'save' ? 0.85 : car.paceMode === 'push' ? 1.05 : 1)
+      const fuelUsed = machine.fuelKgPerKm.value * distanceStep / 1000 * (acceleration < -1 ? 0.35 : 0.85 + 0.15 * Math.min(1, Math.max(0, acceleration) / 4)) * (entry.classId === 'hypercar' ? Math.max(0,(powerKw-hybrid)/powerKw) : 1) * (car.paceMode === 'save' ? 0.85 : car.paceMode === 'push' ? 1.05 : 1)
       car.fuelKg = Math.max(0, car.fuelKg - fuelUsed)
       const deliveredPowerKw = Math.max(0, (mass * acceleration + drag + 0.015 * mass * 9.80665) * car.speedMps / 1000)
       if (car.virtualEnergyMj !== null) {
@@ -328,12 +335,17 @@ function advanceTick(previous: MotorsportRaceState, config: MotorsportRaceConfig
           appendEvent(state, car.entryId, 'Virtual-energy allowance exceeded. Steward review required; fuel remains a separate physical quantity.')
         }
       }
-      const regenerationMj = acceleration < -1 ? Math.min(60, -acceleration * mass * car.speedMps / 1000 * 0.3) * dt / 1000 : 0
-      car.hybridEnergyMj = clamp(car.hybridEnergyMj + regenerationMj - hybrid * dt / 1000, 0, machine.hybridCapacityMj.value)
+      const regenerationMj = acceleration < -1 ? Math.min(machine.hybridRecoveryPowerKw?.value ?? machine.hybridPowerKw.value, -acceleration * mass * car.speedMps / 1000 * 0.3) * dt / 1000 : 0
+      const acceptedRegeneration = machine.hybridCapacityMj.value > 0 ? Math.min(regenerationMj,Math.max(0,machine.hybridCapacityMj.value-car.hybridEnergyMj+hybrid*dt/1000)) : 0
+      car.regenerationPowerKw = acceptedRegeneration*1000/dt
+      car.hybridRecoveredMj = (car.hybridRecoveredMj ?? 0) + acceptedRegeneration
+      car.hybridEnergyMj = clamp(car.hybridEnergyMj + acceptedRegeneration - hybrid * dt / 1000, 0, machine.hybridCapacityMj.value)
       car.hybridDeployedMj += hybrid * dt / 1000
       car.tyreLife = Math.max(0, car.tyreLife - distanceStep / 1000 / (80 + tyreSkill * 180) * (config.weather === 'wet' ? 0.7 : car.tyreSets.at(-1)?.compound === 'alternate' ? 1.4 : 1) * (car.paceMode === 'push' ? 1.2 : car.paceMode === 'save' ? 0.8 : 1))
       car.tyreTemperatureC += (car.speedMps > 15 ? 90 - car.tyreTemperatureC : 35 - car.tyreTemperatureC) * dt / 40
       car.gear = clamp(Math.ceil(car.speedMps / Math.max(1, targetSpeedMps(config.course, machine, car.distanceM)) * machine.gears.value), 1, machine.gears.value)
+      car.rpm = car.speedMps < 0.1 ? 0 : Math.round(3000+car.speedMps*3.6/Math.max(1,car.gear)*180)
+      if (car.status === 'running') car.telemetryHistory = recordTelemetry(car.telemetryHistory,{lap:Math.floor(car.distanceM/length),progress:modulo(car.distanceM,length)/length,seconds:state.raceSeconds,speedKph:car.speedMps*3.6,throttlePercent:car.throttlePercent ?? 0,brakePercent:car.brakePercent ?? 0,gear:car.gear,rpm:car.rpm})
       if (car.pitRequest) {
         const entryLine = (Math.floor(beforeDistance / length) + config.course.pitEntry.value) * length
         const nextEntryLine = entryLine <= beforeDistance ? entryLine + length : entryLine
