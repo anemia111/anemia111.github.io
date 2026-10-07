@@ -837,8 +837,6 @@ export function BroadcastDashboard({
             </button>
             <button
               aria-pressed={applicationMode === 'free'}
-              disabled={Boolean(categoryPresentation)}
-              title={categoryPresentation ? 'Free Mode: F1 / SUPER FORMULA' : undefined}
               onClick={onOpenFreeMode}
               type="button"
             >
@@ -967,7 +965,7 @@ export function BroadcastDashboard({
         <div className="footer-race-control"><Radio size={14}/><strong>RACE CONTROL</strong><time>{raceControlLog[0]?.timeLabel ?? snapshot.elapsedLabel}</time><span>{raceControlLog[0]?.message ?? snapshot.eventMessage}</span></div>
         <div className="footer-controls">
           <button aria-label={isPaused ? 'Resume simulation' : 'Pause simulation'} onClick={onPauseChange} title={isPaused ? 'Resume' : 'Pause'} type="button">{isPaused ? <Play size={14}/> : <Pause size={14}/>}</button>
-          {snapshot.startProcedure === 'formation' ? (
+          {snapshot.startProcedure === 'formation' || (categoryPresentation && sessionPhaseLabel === 'FORMATION') ? (
             <button
               aria-label="Skip formation lap"
               className="formation-skip-control"

@@ -29,6 +29,7 @@ export function dashboardFrame(config: MotorsportRaceConfig, state: MotorsportRa
     const classIndex = classCars.findIndex(row => row.entry.id === entry.id)
     const classLeader = classCars[0].car
     const interval = (ahead: typeof car) => {
+      if (config.sessionKind === 'practice' || config.sessionKind === 'qualifying') return car.bestLapSeconds === null || ahead.bestLapSeconds === null ? '—' : `+${Math.max(0,car.bestLapSeconds-ahead.bestLapSeconds).toFixed(3)}`
       if (car.finishTime !== null && ahead.finishTime !== null) return `+${Math.max(0,car.finishTime+car.penaltySeconds-ahead.finishTime-ahead.penaltySeconds).toFixed(1)}`
       const lapGap = Math.floor(Math.max(0,ahead.distanceM-car.distanceM)/config.course.lengthM)
       return lapGap > 0 ? `+${lapGap}L` : `+${(Math.max(0,ahead.distanceM-car.distanceM)/Math.max(1,car.speedMps)).toFixed(1)}`
@@ -44,7 +45,7 @@ export function dashboardFrame(config: MotorsportRaceConfig, state: MotorsportRa
       gapToLeaderLabel: classIndex === 0 ? 'LEADER' : interval(classLeader),
       gapToAheadLabel: classIndex === 0 ? 'LEADER' : interval(classCars[classIndex-1].car),
       status: car.status.startsWith('pit-') ? 'pit' as const : car.status === 'finished' ? 'finished' as const : car.status === 'retired' ? 'retired' as const : 'running' as const,
-      speedKph: car.speedMps * 3.6, gear: car.gear, fuelLoadKg: car.fuelKg,
+      speedKph: car.speedMps * 3.6, gear: car.gear, fuelLoadKg: car.fuelKg, racePaceMode: car.paceMode ?? 'standard',
       pitStops: car.pits, pitPhase: 'none' as const, penaltySeconds: car.penaltySeconds,
       finishedAtSeconds: car.finishTime, blueFlag: car.blueFlag, hiddenFromTrack: car.status === 'retired' }
   })
@@ -56,7 +57,8 @@ export function dashboardFrame(config: MotorsportRaceConfig, state: MotorsportRa
     // Formation movement is supplied by the category engine, never interpolated by the F1 start renderer.
     startProcedure: 'racing', formationBehindSafetyCar: false, flag, flagLabel: state.flag.toUpperCase(),
     sectorFlags: [], eventMessage: state.events.at(-1)?.message ?? '', flagPhase: null,
-    lowGripConditions: false, raceStartedAtSeconds: state.phase === 'formation' ? null : 0 }
+    weather: config.weather === 'wet' ? 'light-rain' : 'clear', trackGrip: config.weather === 'wet' ? 0.73 : 1,
+    lowGripConditions: config.weather === 'wet', raceStartedAtSeconds: state.phase === 'formation' || config.sessionKind === 'practice' || config.sessionKind === 'qualifying' ? null : state.formationSeconds }
   const timingRows: BroadcastTimingRow[] = standings.map(({entry,car,classPosition}, index) => ({
     car: cars[index], displayPosition: index+1, displayGapToLeaderLabel: cars[index].gapToLeaderLabel,
     displayIntervalLabel: cars[index].gapToAheadLabel, driverOverallAbility: entry.drivers[car.driverIndex].overall ?? 0,
@@ -72,7 +74,7 @@ export function dashboardFrame(config: MotorsportRaceConfig, state: MotorsportRa
       usedTyres: car.tyreSets.map(set => set.compound[0].toUpperCase()).join('/'),
       energyLabel: entry.machine.hybridCapacityMj.value > 0 ? `${Math.round(car.hybridEnergyMj / entry.machine.hybridCapacityMj.value*100)}%` : '—' }
   }))
-  const sceneConfig: RaceConfig = { ...phaseOneConfig, track,
+  const sceneConfig: RaceConfig = { ...phaseOneConfig, track, weekendStage: config.sessionKind === 'practice' ? 'fp1' : config.sessionKind === 'qualifying' ? 'qualifying' : 'race',
     drivers: cars.map(car => ({ ...phaseOneConfig.drivers[0], id: car.driverId, teamId: car.teamId, code: car.code, name: car.driverName, carNumber: car.carNumber })),
     teams: cars.map(car => ({ ...phaseOneConfig.teams[0], id: car.teamId, name: car.teamName, color: car.teamColor })) }
   return { snapshot, timingRows, sceneConfig }

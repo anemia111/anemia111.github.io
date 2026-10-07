@@ -5,6 +5,7 @@ export type MotorsportDriver = {
   id: string; name: string; overall: number | null
   racePace: number | null; consistency: number | null; tyreManagement: number | null
   ratingSource: string | null; fiaGrade?: 'P' | 'G' | 'S' | 'B'
+  qualifyingPace?: number | null
 }
 export type MotorsportMachine = {
   id: string; name: string; classId: MotorsportClass
@@ -43,6 +44,10 @@ export type MotorsportRaceConfig = {
   /** Race director inputs, not randomly generated official decisions. */
   startFuelFraction: number; maximumStintSeconds: number | null
   minimumDriverSeconds: number | null; maximumDriverSeconds: number | null
+  /** Optional for existing race saves. Timed sessions use measured best laps. */
+  sessionKind?: 'practice' | 'qualifying' | 'race'
+  applicationMode?: 'championship' | 'free'
+  freeSettings?: { grid: 'manual' | 'random' | 'qualifying-result'; equalCars: boolean }
 }
 export type MotorsportPitRequest = {
   entryId: string; fuelFraction: number; changeTyres: boolean; nextDriverIndex: number | null
@@ -64,6 +69,9 @@ export type MotorsportCar = {
     fuelAddedKg: number; energyAddedMj: number
   } | null
   laps: number; lastLapSeconds: number | null; bestLapSeconds: number | null; lapStartedAt: number
+  lapHistory?: { lap: number; seconds: number; driverIndex: number; compound: string; pit: boolean }[]
+  lapInvalid?: boolean
+  paceMode?: 'push' | 'standard' | 'save' | 'defend'
   finishTime: number | null; penaltySeconds: number; warnings: string[]
   blueFlag: boolean; pushToPassSeconds: number; hybridDeployedMj: number
 }

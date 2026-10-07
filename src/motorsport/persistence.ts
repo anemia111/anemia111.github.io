@@ -28,6 +28,8 @@ export function parseMotorsportSave(raw: string): MotorsportSave | null {
     const save = JSON.parse(envelope.payload) as MotorsportSave
     if (!finiteTree(save) || save.schemaVersion !== 1 || save.state.schemaVersion !== 1 || save.config.schemaVersion !== 1) return null
     validateMotorsportConfig(save.config)
+    if (save.config.applicationMode !== undefined && !['championship','free'].includes(save.config.applicationMode)) return null
+    if (save.config.freeSettings !== undefined && (!['manual','random','qualifying-result'].includes(save.config.freeSettings.grid) || typeof save.config.freeSettings.equalCars !== 'boolean')) return null
     if (!['kyojo', 'super-gt', 'wec', 'indycar'].includes(save.config.championship) || !['formation', 'racing', 'finished'].includes(save.state.phase)) return null
     if (!['green', 'yellow', 'fcy', 'sc', 'red'].includes(save.state.flag) || save.state.raceSeconds < 0 || !Number.isSafeInteger(save.state.tick) || save.state.tick < 0) return null
     if (![save.state.raceSeconds, save.state.formationSeconds].every(value => Number.isFinite(value) && value >= 0) || typeof save.state.leaderFinished !== 'boolean' || (save.state.flagUntil !== null && !Number.isFinite(save.state.flagUntil))) return null
@@ -35,6 +37,9 @@ export function parseMotorsportSave(raw: string): MotorsportSave | null {
     if (!Array.isArray(save.state.events) || save.state.events.length > 500 || save.state.events.some(event => !Number.isSafeInteger(event.tick) || !Number.isFinite(event.seconds) || typeof event.message !== 'string' || (event.entryId !== null && !save.config.entries.some(entry => entry.id === event.entryId)))) return null
     if (save.state.cars.length !== save.config.entries.length || new Set(save.state.cars.map(car => car.entryId)).size !== save.state.cars.length) return null
     for (const car of save.state.cars) {
+      if (car.paceMode !== undefined && !['push','standard','save','defend'].includes(car.paceMode)) return null
+      if (car.lapInvalid !== undefined && typeof car.lapInvalid !== 'boolean') return null
+      if (car.lapHistory !== undefined && (!Array.isArray(car.lapHistory) || car.lapHistory.length > 1000 || car.lapHistory.some(lap => !Number.isSafeInteger(lap.lap) || lap.lap < 1 || !Number.isFinite(lap.seconds) || lap.seconds <= 0 || !Number.isInteger(lap.driverIndex) || lap.driverIndex < 0 || typeof lap.compound !== 'string' || typeof lap.pit !== 'boolean'))) return null
       const entry = save.config.entries.find(item => item.id === car.entryId)
       if (!Array.isArray(car.tyreSets) || !car.tyreSets.length || car.tyreSets.some(set => !['primary', 'alternate', 'wet'].includes(set.compound) || !Number.isSafeInteger(set.completedLaps) || set.completedLaps < 0)) return null
       if (![car.distanceM, car.speedMps, car.lateralM, car.fuelKg, car.hybridEnergyMj, car.tyreLife, car.tyreTemperatureC, car.stintSeconds, car.pitPathM, car.pitServiceRemaining, car.fuelAddedKg, car.lapStartedAt, car.penaltySeconds, car.pushToPassSeconds, car.hybridDeployedMj].every(Number.isFinite) || !Number.isInteger(car.gear) || typeof car.blueFlag !== 'boolean' || !Number.isSafeInteger(car.lastRefuelLap) || car.lastRefuelLap < 0 || !Array.isArray(car.warnings) || car.warnings.some(warning => typeof warning !== 'string')) return null

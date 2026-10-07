@@ -148,6 +148,7 @@ import { trackSurfaceSectorSummary } from './simulation/trackSurface'
 import {
   buildFreeModeRuntime,
   createDefaultFreeModeConfiguration,
+  createEntrantsFromCategoryGrid,
   freeModeStageFor,
 } from './freeMode/freeModeRegistry'
 import {
@@ -1275,14 +1276,20 @@ const openF1GridResultsFor = (
     )
 }
 
-export default function App({ onOpenMotorsport, requestedSeriesId }: { requestedSeriesId?: SeriesId; onOpenMotorsport?: (championship: import('./motorsport/types').ChampionshipId) => void }) {
+export default function App({ onOpenMotorsport, requestedSeriesId, requestedFreeMode = false }: { requestedFreeMode?: boolean; requestedSeriesId?: SeriesId; onOpenMotorsport?: (championship: import('./motorsport/types').ChampionshipId, free?: boolean) => void }) {
   const [applicationMode, setApplicationMode] =
     useState<ApplicationMode>('championship')
   const [activeFreeModeRuntime, setActiveFreeModeRuntime] =
     useState<FreeModeRuntime | null>(null)
   const [freeModeStoredState, setFreeModeStoredState] =
-    useState<FreeModeStoredState>(initialFreeModeStoredState)
-  const [isFreeModeBuilderOpen, setIsFreeModeBuilderOpen] = useState(false)
+    useState<FreeModeStoredState>(() => {
+      const saved = initialFreeModeStoredState()
+      const requested = requestedFreeMode && requestedSeriesId ? seriesPackageById.get(requestedSeriesId) : null
+      return requested && saved.configuration.categoryId !== requested.id
+        ? { ...saved,configuration:{ ...saved.configuration,categoryId:requested.id,entrants:createEntrantsFromCategoryGrid(requested) } }
+        : saved
+    })
+  const [isFreeModeBuilderOpen, setIsFreeModeBuilderOpen] = useState(requestedFreeMode)
   const [championshipReturnSeriesId, setChampionshipReturnSeriesId] =
     useState<SeriesId>(initialSeriesId)
   const [selectedSeriesId, setSelectedSeriesId] =
@@ -3161,9 +3168,10 @@ export default function App({ onOpenMotorsport, requestedSeriesId }: { requested
   }
   useEffect(() => {
     if (requestedSeriesId && requestedSeriesId !== selectedSeriesId) changeSeries(requestedSeriesId)
+    if (requestedFreeMode) setIsFreeModeBuilderOpen(true)
     // Apply the category selected when returning to this engine.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [requestedSeriesId])
+  }, [requestedSeriesId, requestedFreeMode])
 
 
   const startFreeMode = (configuration: FreeModeConfiguration) => {
@@ -4366,6 +4374,7 @@ export default function App({ onOpenMotorsport, requestedSeriesId }: { requested
       ) : null}
 
       <FreeModeBuilder
+        onOpenMotorsport={onOpenMotorsport}
         context={freeModeBuildContext}
         initialConfiguration={freeModeStoredState.configuration}
         isOpen={isFreeModeBuilderOpen}

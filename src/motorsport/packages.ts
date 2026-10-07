@@ -60,6 +60,7 @@ export function motorsportDriver(name: string): MotorsportDriver {
   const person = catalogPoolDriverById.get(id)
   return { id, name: person?.name ?? name, overall: person?.overall ?? null,
     racePace: person?.ratings.racePace ?? null, consistency: person?.ratings.consistency ?? null,
+    qualifyingPace: person?.ratings.qualifyingPace ?? null,
     tyreManagement: person?.ratings.tyreManagement ?? null,
     ratingSource: person?.provenance.find(source => source.id === person.ratingSourceProvenanceId)?.sourceFile ?? null }
 }

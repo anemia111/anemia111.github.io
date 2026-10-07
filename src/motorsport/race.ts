@@ -7,6 +7,8 @@ function appendEvent(state: MotorsportRaceState, entryId: string | null, message
   if (state.events.length > 500) state.events.splice(0, state.events.length - 500)
 }
 export function validateMotorsportConfig(config: MotorsportRaceConfig) {
+  if (config.sessionKind !== undefined && !['race', 'practice', 'qualifying'].includes(config.sessionKind)) throw new Error('Invalid session kind')
+  if (config.sessionKind && config.sessionKind !== 'race' && config.format.kind !== 'time') throw new Error('Timed sessions require a duration')
   if (config.schemaVersion !== 1 || !['kyojo', 'super-gt', 'wec', 'indycar'].includes(config.championship) || typeof config.seed !== 'string' || typeof config.eventId !== 'string') throw new Error('Invalid championship configuration')
   if (!['standing', 'rolling'].includes(config.start) || !['dry', 'wet'].includes(config.weather) || !Number.isFinite(config.startFuelFraction) || config.startFuelFraction < 0 || config.startFuelFraction > 1) throw new Error('Invalid starting conditions')
   for (const limit of [config.maximumStintSeconds, config.minimumDriverSeconds, config.maximumDriverSeconds]) if (limit !== null && (!Number.isFinite(limit) || limit < 0)) throw new Error('Invalid driver time limit')
@@ -23,6 +25,7 @@ export function validateMotorsportConfig(config: MotorsportRaceConfig) {
     if (typeof entry.id !== 'string' || !entry.id || typeof entry.number !== 'string' || typeof entry.team !== 'string' || typeof entry.machine.name !== 'string' || !['kyojo', 'gt500', 'gt300', 'hypercar', 'lmgt3', 'lmp2', 'indycar'].includes(entry.classId) || entry.machine.classId !== entry.classId) throw new Error('Invalid car identity')
     if (!entry.drivers.length || new Set(entry.drivers.map(driver => driver.id)).size !== entry.drivers.length) throw new Error(`Invalid crew for ${entry.id}`)
     for (const driver of entry.drivers) {
+      if (driver.qualifyingPace !== undefined && driver.qualifyingPace !== null && (!Number.isFinite(driver.qualifyingPace) || driver.qualifyingPace < 0 || driver.qualifyingPace > 1)) throw new Error('Invalid qualifying skill')
       if (typeof driver.id !== 'string' || typeof driver.name !== 'string' || (driver.overall !== null && (!Number.isFinite(driver.overall) || driver.overall < 0 || driver.overall > 100))) throw new Error('Invalid driver')
       for (const rating of [driver.racePace, driver.consistency, driver.tyreManagement]) if (rating !== null && (!Number.isFinite(rating) || rating < 0 || rating > 1)) throw new Error('Invalid driver skill')
     }
@@ -46,14 +49,23 @@ export function createMotorsportRace(config: MotorsportRaceConfig): MotorsportRa
     driverIndex: 0, driverSeconds: entry.drivers.map(() => 0), driverLastOutSeconds: entry.drivers.map(() => -1), stintSeconds: 0,
     driverDistanceM: entry.drivers.map(() => 0), drivingStints: [], activeDrivingStart: null, activeDrivingEnd: 0, lastRefuelLap: 0,
     status: 'running', pitPathM: 0, pitServiceRemaining: 0, pitRequest: null,
-    pits: 0, fuelAddedKg: 0, stopWork: null, laps: 0, lastLapSeconds: null, bestLapSeconds: null, lapStartedAt: 0,
+    pits: 0, fuelAddedKg: 0, stopWork: null, laps: 0, lastLapSeconds: null, bestLapSeconds: null, lapStartedAt: 0, lapHistory: [],
     finishTime: null, penaltySeconds: 0, warnings: [], blueFlag: false,
     pushToPassSeconds: config.championship === 'indycar' && (config.course.kind === 'road' || config.course.kind === 'street') ? 200 : 0,
     hybridDeployedMj: 0,
   }))
-  return { schemaVersion: 1, tick: 0, raceSeconds: 0, formationSeconds: 0, phase: 'formation', cars,
+  const timed = config.sessionKind === 'practice' || config.sessionKind === 'qualifying'
+  if (timed) cars.forEach((car, index) => {
+    // Independent SIM pit releases, spaced along the exit queue. The first
+    // partial out lap is excluded from best-lap classification below.
+    car.distanceM = -index * 20
+    car.status = 'pit-exit'; car.pitPathM = config.course.pitLengthM.value * 0.5
+    car.lapInvalid = true
+    car.speedMps = config.course.pitSpeedKph.value / 3.6
+  })
+  return { schemaVersion: 1, tick: 0, raceSeconds: 0, formationSeconds: 0, phase: timed ? 'racing' : 'formation', cars,
     flag: 'green', flagUntil: null, leaderFinished: false, winnerId: null,
-    events: [{ tick: 0, seconds: 0, entryId: null, message: 'SIM formation. Source references and every estimated physical input are retained in this race configuration.' }] }
+    events: [{ tick: 0, seconds: 0, entryId: null, message: timed ? `SIM ${config.sessionKind}: timed best-lap session; category knockout/group formats are not inferred.` : 'SIM formation. Source references and every estimated physical input are retained in this race configuration.' }] }
 }
 
 function pitWork(config: MotorsportRaceConfig, car: MotorsportCar, entry: MotorsportEntry, request: MotorsportPitRequest) {
@@ -77,7 +89,7 @@ function pitWork(config: MotorsportRaceConfig, car: MotorsportCar, entry: Motors
   return { fuelAddedKg, energyAdded, fuelSeconds, tyreSeconds, driverSeconds, total: Math.max(2, total) }
 }
 function requestForStrategy(config: MotorsportRaceConfig, entry: MotorsportEntry, car: MotorsportCar): MotorsportPitRequest | null {
-  if (config.championship === 'kyojo') return null
+  if (config.championship === 'kyojo' && config.applicationMode !== 'free') return null
   const fuelReserve = entry.machine.fuelKgPerKm.value * config.course.lengthM / 1000 * 1.8
   // A request immediately after the pit entry still needs nearly a full lap
   // before service. Le Mans' 13.6km lap consumes far more than an 8% reserve.
@@ -87,7 +99,7 @@ function requestForStrategy(config: MotorsportRaceConfig, entry: MotorsportEntry
   const requiredAlternates = config.course.kind === 'street' || config.course.id === 'nashville' ? 2 : 1
   const missingAlternates = requiredAlternates - car.tyreSets.filter(set => set.compound === 'alternate' && set.completedLaps >= 2).length
   const compoundDue = config.championship === 'indycar' && config.weather === 'dry' && (config.course.kind === 'road' || config.course.kind === 'street' || config.course.id === 'nashville') && config.format.kind === 'laps' && config.format.laps >= 6 && missingAlternates > 0 && car.tyreSets.at(-1)!.completedLaps >= 2 && config.format.laps - car.laps <= missingAlternates * 4 + 2
-  const gtShareDue = config.championship === 'super-gt' && (config.format.kind !== 'laps' || config.format.laps >= 6) && (config.format.kind === 'laps'
+  const gtShareDue = config.applicationMode !== 'free' && config.championship === 'super-gt' && (config.format.kind !== 'laps' || config.format.laps >= 6) && (config.format.kind === 'laps'
     ? car.driverDistanceM[car.driverIndex] >= Math.max(0, config.format.laps * 2 / 3 - 2) * config.course.lengthM
     : car.driverSeconds[car.driverIndex] >= config.format.seconds * 2 / 3 - 180)
   const windowDue = config.championship === 'wec' && config.course.id === 'le-mans' && drivingTimeInWindow(car, car.driverIndex, car.activeDrivingEnd - 21600, car.activeDrivingEnd) >= 14220
@@ -110,6 +122,7 @@ function closeDrivingStint(car: MotorsportCar, end = car.activeDrivingEnd) {
 
 /** Findings preserve steward discretion instead of inventing an automatic penalty. */
 export function motorsportCrewAudit(car: MotorsportCar, config: MotorsportRaceConfig): string[] {
+  if (config.applicationMode === 'free' || config.sessionKind === 'practice' || config.sessionKind === 'qualifying') return []
   const entry = config.entries.find(item => item.id === car.entryId)!
   const findings: string[] = []
   if (config.championship === 'indycar' && config.weather === 'dry' && (config.course.kind === 'road' || config.course.kind === 'street' || config.course.id === 'nashville')) {
@@ -146,7 +159,7 @@ export function requestMotorsportPit(state: MotorsportRaceState, request: Motors
   if (!entry) throw new Error('Unknown pit-request car')
   if (!Number.isFinite(request.fuelFraction) || request.fuelFraction < 0 || request.fuelFraction > 1) throw new Error('Invalid refuel target')
   if (request.nextDriverIndex !== null && (!Number.isInteger(request.nextDriverIndex) || request.nextDriverIndex < 0 || request.nextDriverIndex >= entry.drivers.length)) throw new Error('Unknown replacement driver')
-  if (config.championship === 'kyojo' && (request.fuelFraction > 0 || request.nextDriverIndex !== null)) throw new Error('KYOJO has no routine refuelling or crew changes')
+  if (config.applicationMode !== 'free' && config.championship === 'kyojo' && (request.fuelFraction > 0 || request.nextDriverIndex !== null)) throw new Error('KYOJO has no routine refuelling or crew changes')
   return { ...state, cars: state.cars.map(car => car.entryId === request.entryId && car.status === 'running' ? { ...car, pitRequest: { ...request } } : car) }
 }
 
@@ -214,6 +227,7 @@ function advanceTick(previous: MotorsportRaceState, config: MotorsportRaceConfig
     const car: MotorsportCar = { ...old, driverSeconds: [...old.driverSeconds], driverLastOutSeconds: [...old.driverLastOutSeconds], driverDistanceM: [...old.driverDistanceM], warnings: [...old.warnings] }
     const entry = entries.get(car.entryId)!, machine = entry.machine, driver = entry.drivers[car.driverIndex]
     const beforeDistance = car.distanceM
+    if (car.status !== 'running') car.lapInvalid = true
     if (car.status !== 'running') {
       car.speedMps = car.status === 'pit-service' ? 0 : config.course.pitSpeedKph.value / 3.6
       if (car.status === 'pit-service') {
@@ -263,11 +277,12 @@ function advanceTick(previous: MotorsportRaceState, config: MotorsportRaceConfig
       car.driverSeconds[car.driverIndex] += dt; car.stintSeconds += dt
       if (car.activeDrivingStart === null) car.activeDrivingStart = previous.raceSeconds
       car.activeDrivingEnd = state.raceSeconds
-      const paceSkill = driver.racePace ?? 0.75
+      const paceSkill = config.sessionKind === 'qualifying' ? driver.qualifyingPace ?? driver.racePace ?? 0.75 : driver.racePace ?? 0.75
       const tyreSkill = driver.tyreManagement ?? 0.75
       const compoundGrip = car.tyreSets.at(-1)?.compound === 'alternate' ? 1.03 : 1
       const surfaceGrip = (config.weather === 'wet' ? 0.73 : 1) * compoundGrip
-      let target = targetSpeedMps(config.course, machine, car.distanceM) * (0.95 + paceSkill * 0.05) * Math.sqrt(surfaceGrip) * (0.9 + car.tyreLife * 0.1)
+      const paceFactor = car.paceMode === 'push' ? 1.015 : car.paceMode === 'save' ? 0.96 : car.paceMode === 'defend' ? 0.99 : 1
+      let target = targetSpeedMps(config.course, machine, car.distanceM) * Math.min(1,(0.95 + paceSkill * 0.05) * paceFactor) * Math.sqrt(surfaceGrip) * (0.9 + car.tyreLife * 0.1)
       if (state.flag === 'fcy') target = Math.min(target, 80 / 3.6)
       if (state.flag === 'yellow') target *= 0.7
       if (state.flag === 'sc') target = Math.min(target, 100 / 3.6)
@@ -302,7 +317,7 @@ function advanceTick(previous: MotorsportRaceState, config: MotorsportRaceConfig
         : unconstrainedStep
       car.speedMps = nextSpeed; car.distanceM += distanceStep
       car.driverDistanceM[car.driverIndex] += distanceStep
-      const fuelUsed = machine.fuelKgPerKm.value * distanceStep / 1000 * (acceleration < -1 ? 0.35 : 0.85 + 0.15 * Math.min(1, Math.max(0, acceleration) / 4))
+      const fuelUsed = machine.fuelKgPerKm.value * distanceStep / 1000 * (acceleration < -1 ? 0.35 : 0.85 + 0.15 * Math.min(1, Math.max(0, acceleration) / 4)) * (car.paceMode === 'save' ? 0.85 : car.paceMode === 'push' ? 1.05 : 1)
       car.fuelKg = Math.max(0, car.fuelKg - fuelUsed)
       const deliveredPowerKw = Math.max(0, (mass * acceleration + drag + 0.015 * mass * 9.80665) * car.speedMps / 1000)
       if (car.virtualEnergyMj !== null) {
@@ -316,7 +331,7 @@ function advanceTick(previous: MotorsportRaceState, config: MotorsportRaceConfig
       const regenerationMj = acceleration < -1 ? Math.min(60, -acceleration * mass * car.speedMps / 1000 * 0.3) * dt / 1000 : 0
       car.hybridEnergyMj = clamp(car.hybridEnergyMj + regenerationMj - hybrid * dt / 1000, 0, machine.hybridCapacityMj.value)
       car.hybridDeployedMj += hybrid * dt / 1000
-      car.tyreLife = Math.max(0, car.tyreLife - distanceStep / 1000 / (80 + tyreSkill * 180) * (config.weather === 'wet' ? 0.7 : car.tyreSets.at(-1)?.compound === 'alternate' ? 1.4 : 1))
+      car.tyreLife = Math.max(0, car.tyreLife - distanceStep / 1000 / (80 + tyreSkill * 180) * (config.weather === 'wet' ? 0.7 : car.tyreSets.at(-1)?.compound === 'alternate' ? 1.4 : 1) * (car.paceMode === 'push' ? 1.2 : car.paceMode === 'save' ? 0.8 : 1))
       car.tyreTemperatureC += (car.speedMps > 15 ? 90 - car.tyreTemperatureC : 35 - car.tyreTemperatureC) * dt / 40
       car.gear = clamp(Math.ceil(car.speedMps / Math.max(1, targetSpeedMps(config.course, machine, car.distanceM)) * machine.gears.value), 1, machine.gears.value)
       if (car.pitRequest) {
@@ -338,7 +353,12 @@ function advanceTick(previous: MotorsportRaceState, config: MotorsportRaceConfig
       const fraction = clamp((completedAfter * length - beforeDistance) / Math.max(0.001, car.distanceM - beforeDistance), 0, 1)
       const crossing = previous.raceSeconds + dt * fraction
       const lapTime = crossing - car.lapStartedAt
-      car.lastLapSeconds = lapTime; car.bestLapSeconds = Math.min(car.bestLapSeconds ?? Infinity, lapTime)
+      const timed = config.sessionKind === 'practice' || config.sessionKind === 'qualifying'
+      const validLap = !timed || (completedBefore > 0 && !car.lapInvalid && car.status === 'running')
+      car.lastLapSeconds = lapTime
+      if (validLap) car.bestLapSeconds = Math.min(car.bestLapSeconds ?? Infinity, lapTime)
+      car.lapHistory = [...(car.lapHistory ?? []), { lap: completedAfter, seconds: lapTime, driverIndex: car.driverIndex, compound: car.tyreSets.at(-1)!.compound, pit: !validLap || car.status !== 'running' }].slice(-1000)
+      car.lapInvalid = car.status !== 'running'
       car.lapStartedAt = crossing; car.laps = completedAfter
       if (RUNNING.has(car.status)) crossings.push({ entryId: car.entryId, time: crossing, laps: completedAfter })
     }
@@ -346,6 +366,14 @@ function advanceTick(previous: MotorsportRaceState, config: MotorsportRaceConfig
   })
   // Apply crossing events chronologically, independent of entry-list order.
   for (const crossing of crossings.sort((a, b) => a.time - b.time || a.entryId.localeCompare(b.entryId))) {
+    if (config.sessionKind === 'practice' || config.sessionKind === 'qualifying') {
+      if (config.format.kind === 'time' && crossing.time >= config.format.seconds) {
+        const car = state.cars.find(item => item.entryId === crossing.entryId)!
+        car.status = 'finished'; car.finishTime = crossing.time; car.speedMps = 0
+        closeDrivingStint(car, crossing.time)
+      }
+      continue
+    }
     const distanceOver = config.format.kind === 'laps' ? crossing.laps >= config.format.laps : crossing.time >= config.format.seconds
     if (!state.leaderFinished && crossing.laps > leadLapBefore && distanceOver) {
       state.leaderFinished = true; state.winnerId = crossing.entryId
@@ -374,7 +402,8 @@ export function advanceMotorsportRace(state: MotorsportRaceState, ticks: number,
 export function motorsportStandings(state: MotorsportRaceState, config: MotorsportRaceConfig) {
   const entries = new Map(config.entries.map(entry => [entry.id, entry]))
   const classPositions = new Map<string, number>()
-  return [...state.cars].sort((a, b) => b.laps - a.laps ||
+  const timed = config.sessionKind === 'practice' || config.sessionKind === 'qualifying'
+  return [...state.cars].sort((a, b) => (timed ? (a.bestLapSeconds ?? Infinity) - (b.bestLapSeconds ?? Infinity) : 0) || b.laps - a.laps ||
     (a.finishTime !== null && b.finishTime !== null ? a.finishTime + a.penaltySeconds - b.finishTime - b.penaltySeconds : b.distanceM - a.distanceM) || a.entryId.localeCompare(b.entryId))
     .map((car, index) => {
       const entry = entries.get(car.entryId)!, position = (classPositions.get(entry.classId) ?? 0) + 1

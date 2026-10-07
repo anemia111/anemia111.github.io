@@ -22,7 +22,7 @@ try {
     for (const [championship, expected] of [['kyojo', 18], ['super-gt', 43], ['wec', 35], ['indycar', 25]]) {
       await page.getByRole('combobox', { name: 'Racing series', exact: true }).selectOption(`motorsport:${championship}`)
       await page.getByRole('button', { name: 'Open setup', exact: true }).click()
-      assert.equal(await page.getByRole('button', {name:'FREE',exact:true}).isDisabled(), true)
+      assert.equal(await page.getByRole('button', {name:'FREE',exact:true}).isEnabled(), true)
       const rows = page.locator('.leaderboard-rows > li')
       await rows.first().waitFor()
       assert.equal(await rows.count(), expected, `${championship}: field size`)
