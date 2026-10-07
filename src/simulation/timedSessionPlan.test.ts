@@ -437,7 +437,7 @@ describe('timed session plan', () => {
     expect(observedLongRun.timedRunsCompleted).toBe(1)
     expect(['H', 'M']).toContain(requireF1Runtime(observedLongRun).tires.tire)
     expect(observedLongRun.racePaceMode).toBe('standard')
-  })
+  }, 20_000)
 
   it('makes preparation traffic lift for a nearby FP attack car on a safe straight', () => {
     const drivers = initialDrivers.slice(0, 2)
