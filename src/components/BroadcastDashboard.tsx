@@ -644,13 +644,15 @@ function CenterView({
 }) {
   return (
     <div className="data-view">
+      <div className="data-content">
       <div className="data-detail-grid">
         {dataDetails.map((detail) => (
           <div key={detail.label}><span>{detail.label}</span><strong>{detail.value}</strong><SourceTag source={detail.source} /></div>
         ))}
       </div>
+        <ExpansionCatalog />
+      </div>
       {dataControl}
-      <ExpansionCatalog />
     </div>
   )
 }

@@ -1202,6 +1202,10 @@ async function inspectExpansionCatalog(browser) {
         missingShapes: await detail.locator('.expansion-course-unavailable').count() })
       const clipped = await detail.evaluate((element) => element.scrollWidth > element.clientWidth + 1)
       if (clipped) throw new Error('Expansion catalog table overflows at 1280px')
+      if (await page.locator('.data-content').evaluate((element) => element.scrollWidth > element.clientWidth + 1)) throw new Error('Expansion data has horizontal overflow')
+      await detail.locator('table').last().scrollIntoViewIfNeeded()
+      const contentScroll = await inspectScroll(page.locator('.data-content'))
+      if (!contentScroll.reachedBottom || contentScroll.maxScrollTop <= 0) throw new Error('Expansion data cannot scroll to its last row')
       await summaries.nth(index).click()
     }
     if (JSON.stringify(rowCounts) !== JSON.stringify([20, 14, 29, 33, 17, 18])) {
@@ -1213,7 +1217,8 @@ async function inspectExpansionCatalog(browser) {
     }
     if (!(await catalog.innerText()).includes('レース実行は未対応')) throw new Error('Catalog implies executable series')
     await summaries.first().click()
-    await catalog.screenshot({ path: join(artifactDirectory, 'expansion-catalog.png') })
+    await catalog.locator('.expansion-machine').first().scrollIntoViewIfNeeded()
+    await page.screenshot({ path: join(artifactDirectory, 'expansion-catalog.png') })
     return { rowCounts, assetCounts, labelledUnavailable: true, noHorizontalOverflow: true }
   } finally {
     await page.close()

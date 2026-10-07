@@ -1904,8 +1904,10 @@
 .detail-grid > span { display: inline-flex; align-items: center; gap: 5px; color: var(--broadcast-muted); }
 
 .data-view { display: grid; grid-template-columns: minmax(0, 1fr) 190px; gap: 10px; height: 100%; min-height: 0; padding: 5px 10px; overflow: hidden; }
+.data-content { min-width: 0; min-height: 0; overflow: auto; padding-right: 4px; }
+.data-content .data-detail-grid { grid-auto-rows: minmax(24px, auto); }
 .data-detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3px 10px; min-height: 0; }
-.data-detail-grid > div { display: grid; grid-template-columns: minmax(74px, 0.8fr) minmax(0, 1fr) 28px; align-items: center; gap: 4px; min-width: 0; border-bottom: 1px solid #10202d; font-size: 7px; }
+.data-detail-grid > div { display: grid; grid-template-columns: minmax(74px, 0.8fr) minmax(0, 1fr) 54px; align-items: center; gap: 4px; min-width: 0; border-bottom: 1px solid #10202d; font-size: 7px; }
 .data-detail-grid span { color: var(--broadcast-muted); }
 .data-detail-grid strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .broadcast-data-control { display: grid; align-content: center; gap: 7px; min-width: 0; }
