@@ -37,6 +37,7 @@ describe('existing dashboard category presentation', () => {
     const before = structuredClone(state)
     const frame = dashboardFrame(config,state,dashboardCourse(config))
     expect(frame.timingRows).toHaveLength(62)
+    expect(frame.timingRows.find(row => row.car.driverId === config.entries[0].id)?.categoryDisplay?.carNumberLabel).toBe(config.entries[0].number)
     expect(new Set(frame.timingRows.map(row => row.categoryDisplay?.classId))).toEqual(new Set(['hypercar','lmp2','lmgt3']))
     expect(frame.snapshot.cars.find(car => car.driverId === state.cars[0].entryId)?.driverName).toBe(config.entries[0].drivers[1].name)
     expect(state).toEqual(before)

@@ -67,7 +67,7 @@ const practiceProgramLabels: Record<
 }
 
 export type BroadcastTimingRow = {
-  categoryDisplay?: { classLabel: string; classId: string; classPosition: number; tyreLabel: string; usedTyres: string; energyLabel: string }
+  categoryDisplay?: { carNumberLabel: string; classLabel: string; classId: string; classPosition: number; tyreLabel: string; usedTyres: string; energyLabel: string }
   aeroOvertakeLabel: string
   /** F1-only Energy Store SOC; null for a SUPER FORMULA runtime. */
   batteryPercent: number | null
@@ -543,7 +543,7 @@ function LeftLeaderboard({
                     </small>
                   ) : showCarNumbers ? (
                     <small className="leaderboard-car-number">
-                      #{row.car.carNumber}
+                      #{row.categoryDisplay?.carNumberLabel ?? row.car.carNumber}
                     </small>
                   ) : practiceProgram &&
                     (stage === 'fp1' || stage === 'fp2' || stage === 'fp3') ? (

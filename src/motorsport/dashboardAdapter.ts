@@ -67,7 +67,7 @@ export function dashboardFrame(config: MotorsportRaceConfig, state: MotorsportRa
     telemetrySource: 'simulation', throttlePercent: 0,
     tireDisplay: { kind: 'f1-pirelli', compound: 'M', ageLaps: 0, label: 'SIM' },
     tireModelSource: 'simulation', tireLifePercent: car.tyreLife*100, tirePaceDeltaSeconds: null, tireTemperatureC: car.tyreTemperatureC,
-    categoryDisplay: { classId: entry.classId, classPosition, classLabel: `${entry.classId.toUpperCase()} P${classPosition}`,
+    categoryDisplay: { carNumberLabel: entry.number, classId: entry.classId, classPosition, classLabel: `${entry.classId.toUpperCase()} P${classPosition}`,
       tyreLabel: `${car.tyreSets.at(-1)?.compound ?? 'primary'} / SIM`,
       usedTyres: car.tyreSets.map(set => set.compound[0].toUpperCase()).join('/'),
       energyLabel: entry.machine.hybridCapacityMj.value > 0 ? `${Math.round(car.hybridEnergyMj / entry.machine.hybridCapacityMj.value*100)}%` : '—' }
