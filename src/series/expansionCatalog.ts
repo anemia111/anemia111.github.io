@@ -16,6 +16,8 @@ export type CatalogEvent = {
   trackKey: string
   dateLabel: string
   sourceId: string
+  raceName?: string
+  url?: string
 }
 export type ExpansionCategory = {
   id: string

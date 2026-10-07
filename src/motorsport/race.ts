@@ -1,0 +1,384 @@
+import { clamp, modulo, MOTORSPORT_STEP_SECONDS, targetSpeedMps } from './coursePhysics'
+import type { MotorsportCar, MotorsportEntry, MotorsportPitRequest, MotorsportRaceConfig, MotorsportRaceState } from './types'
+
+const RUNNING = new Set(['running', 'pit-entry', 'pit-service', 'pit-exit'])
+function appendEvent(state: MotorsportRaceState, entryId: string | null, message: string) {
+  state.events.push({ tick: state.tick, seconds: state.raceSeconds, entryId, message })
+  if (state.events.length > 500) state.events.splice(0, state.events.length - 500)
+}
+export function validateMotorsportConfig(config: MotorsportRaceConfig) {
+  if (config.schemaVersion !== 1 || !['kyojo', 'super-gt', 'wec', 'indycar'].includes(config.championship) || typeof config.seed !== 'string' || typeof config.eventId !== 'string') throw new Error('Invalid championship configuration')
+  if (!['standing', 'rolling'].includes(config.start) || !['dry', 'wet'].includes(config.weather) || !Number.isFinite(config.startFuelFraction) || config.startFuelFraction < 0 || config.startFuelFraction > 1) throw new Error('Invalid starting conditions')
+  for (const limit of [config.maximumStintSeconds, config.minimumDriverSeconds, config.maximumDriverSeconds]) if (limit !== null && (!Number.isFinite(limit) || limit < 0)) throw new Error('Invalid driver time limit')
+  if (!config.entries.length || config.entries.length > 100) throw new Error('Race requires 1–100 cars')
+  if (new Set(config.entries.map(entry => entry.id)).size !== config.entries.length) throw new Error('Duplicate car identity')
+  if (!(config.course.lengthM > 100) || config.course.lengthM > 100000 || !Number.isFinite(config.course.lengthM) || config.course.points.length < 3 || config.course.points.length > 32768 || config.course.points.some(point => !Array.isArray(point) || point.length !== 2 || point.some(coordinate => !Number.isFinite(coordinate)))) throw new Error('Invalid course')
+  if (!['road', 'street', 'short-oval', 'speedway'].includes(config.course.kind)) throw new Error('Invalid course kind')
+  for (const value of [config.course.pitEntry.value, config.course.pitExit.value]) if (!Number.isFinite(value) || value < 0 || value >= 1) throw new Error('Invalid pit position')
+  for (const value of [config.course.pitLengthM.value, config.course.pitSpeedKph.value, config.course.widthM.value]) if (!Number.isFinite(value) || value <= 0) throw new Error('Invalid course operation')
+  if (!Number.isFinite(config.course.bankingDegrees.value) || Math.abs(config.course.bankingDegrees.value) > 60) throw new Error('Invalid banking')
+  if (!['laps', 'time'].includes(config.format.kind)) throw new Error('Invalid race format')
+  if (config.format.kind === 'laps' ? !Number.isInteger(config.format.laps) || config.format.laps < 1 : !Number.isFinite(config.format.seconds) || config.format.seconds <= 0) throw new Error('Invalid race distance')
+  for (const entry of config.entries) {
+    if (typeof entry.id !== 'string' || !entry.id || typeof entry.number !== 'string' || typeof entry.team !== 'string' || typeof entry.machine.name !== 'string' || !['kyojo', 'gt500', 'gt300', 'hypercar', 'lmgt3', 'lmp2', 'indycar'].includes(entry.classId) || entry.machine.classId !== entry.classId) throw new Error('Invalid car identity')
+    if (!entry.drivers.length || new Set(entry.drivers.map(driver => driver.id)).size !== entry.drivers.length) throw new Error(`Invalid crew for ${entry.id}`)
+    for (const driver of entry.drivers) {
+      if (typeof driver.id !== 'string' || typeof driver.name !== 'string' || (driver.overall !== null && (!Number.isFinite(driver.overall) || driver.overall < 0 || driver.overall > 100))) throw new Error('Invalid driver')
+      for (const rating of [driver.racePace, driver.consistency, driver.tyreManagement]) if (rating !== null && (!Number.isFinite(rating) || rating < 0 || rating > 1)) throw new Error('Invalid driver skill')
+    }
+    for (const value of [entry.machine.massKg.value, entry.machine.powerKw.value, entry.machine.fuelCapacityKg.value, entry.machine.fuelKgPerKm.value, entry.machine.dragAreaM2.value, entry.machine.tyreMu.value]) {
+      if (!(value > 0) || !Number.isFinite(value)) throw new Error(`Invalid physical input for ${entry.id}`)
+    }
+    if (!Number.isInteger(entry.machine.gears.value) || entry.machine.gears.value < 1 || entry.machine.gears.value > 12) throw new Error('Invalid transmission')
+    for (const value of [entry.machine.driverMassKg.value, entry.machine.liftAreaM2.value, entry.machine.hybridPowerKw.value, entry.machine.hybridCapacityMj.value]) if (!Number.isFinite(value) || value < 0) throw new Error('Invalid physical input')
+    if (entry.machine.virtualEnergyCapacityMj !== null && (!Number.isFinite(entry.machine.virtualEnergyCapacityMj.value) || entry.machine.virtualEnergyCapacityMj.value <= 0)) throw new Error('Invalid energy allowance')
+  }
+}
+export function createMotorsportRace(config: MotorsportRaceConfig): MotorsportRaceState {
+  validateMotorsportConfig(config)
+  const cars: MotorsportCar[] = config.entries.map((entry, index) => ({
+    entryId: entry.id, distanceM: index === 0 ? 0 : -index * 9, speedMps: config.start === 'rolling' ? 80 / 3.6 : 0,
+    lateralM: index % 2 ? 1.5 : -1.5, gear: config.start === 'rolling' ? 2 : 1,
+    fuelKg: entry.machine.fuelCapacityKg.value * clamp(config.startFuelFraction, 0, 1),
+    virtualEnergyMj: entry.machine.virtualEnergyCapacityMj?.value ?? null,
+    hybridEnergyMj: entry.machine.hybridCapacityMj.value, tyreLife: 1, tyreTemperatureC: 65,
+    tyreSets: [{ compound: config.weather === 'wet' ? 'wet' : 'primary', completedLaps: 0 }],
+    driverIndex: 0, driverSeconds: entry.drivers.map(() => 0), driverLastOutSeconds: entry.drivers.map(() => -1), stintSeconds: 0,
+    driverDistanceM: entry.drivers.map(() => 0), drivingStints: [], activeDrivingStart: null, activeDrivingEnd: 0, lastRefuelLap: 0,
+    status: 'running', pitPathM: 0, pitServiceRemaining: 0, pitRequest: null,
+    pits: 0, fuelAddedKg: 0, stopWork: null, laps: 0, lastLapSeconds: null, bestLapSeconds: null, lapStartedAt: 0,
+    finishTime: null, penaltySeconds: 0, warnings: [], blueFlag: false,
+    pushToPassSeconds: config.championship === 'indycar' && (config.course.kind === 'road' || config.course.kind === 'street') ? 200 : 0,
+    hybridDeployedMj: 0,
+  }))
+  return { schemaVersion: 1, tick: 0, raceSeconds: 0, formationSeconds: 0, phase: 'formation', cars,
+    flag: 'green', flagUntil: null, leaderFinished: false, winnerId: null,
+    events: [{ tick: 0, seconds: 0, entryId: null, message: 'SIM formation. Source references and every estimated physical input are retained in this race configuration.' }] }
+}
+
+function pitWork(config: MotorsportRaceConfig, car: MotorsportCar, entry: MotorsportEntry, request: MotorsportPitRequest) {
+  const fraction = clamp(request.fuelFraction, 0, 1)
+  const fuelAddedKg = Math.max(0, entry.machine.fuelCapacityKg.value * fraction - car.fuelKg)
+  const energyAdded = car.virtualEnergyMj === null ? 0 : Math.max(0, (entry.machine.virtualEnergyCapacityMj?.value ?? 0) * fraction - car.virtualEnergyMj)
+  // WEC virtual energy is a separate allowance. Its proportional 40s reference
+  // is never used as an instantaneous fuel-tank fill or added engine power.
+  const fuelSeconds = entry.classId === 'lmp2' && config.course.id === 'le-mans'
+    ? Math.min(60, Math.max(0, car.laps - car.lastRefuelLap + (car.pits === 0 ? 2 : 0)) * 4)
+    : config.championship === 'wec' && car.virtualEnergyMj !== null
+    ? 2 + 40 * energyAdded / Math.max(1, entry.machine.virtualEnergyCapacityMj?.value ?? 1)
+    : fuelAddedKg / (config.championship === 'indycar' ? 4 : 2)
+  const tyreSeconds = request.changeTyres ? config.championship === 'indycar' ? 7 : 20 : 0
+  const driverSeconds = request.nextDriverIndex !== null && request.nextDriverIndex !== car.driverIndex ? 12 : 0
+  // WEC refuelling is first, with the car on its wheels and no tools. Driver
+  // change can overlap; tyre work begins after the refuelling phase.
+  const total = config.championship === 'indycar'
+    ? Math.max(fuelSeconds, tyreSeconds, driverSeconds)
+    : Math.max(fuelSeconds + tyreSeconds, driverSeconds)
+  return { fuelAddedKg, energyAdded, fuelSeconds, tyreSeconds, driverSeconds, total: Math.max(2, total) }
+}
+function requestForStrategy(config: MotorsportRaceConfig, entry: MotorsportEntry, car: MotorsportCar): MotorsportPitRequest | null {
+  if (config.championship === 'kyojo') return null
+  const fuelReserve = entry.machine.fuelKgPerKm.value * config.course.lengthM / 1000 * 1.8
+  // A request immediately after the pit entry still needs nearly a full lap
+  // before service. Le Mans' 13.6km lap consumes far more than an 8% reserve.
+  const energyReserve = (entry.machine.virtualEnergyCapacityMj?.value ?? 0) * (config.course.lengthM > 10000 ? 0.35 : 0.15)
+  const stintDue = config.maximumStintSeconds !== null && car.stintSeconds >= config.maximumStintSeconds - 180
+  const tyresDue = car.tyreLife < 0.28
+  const requiredAlternates = config.course.kind === 'street' || config.course.id === 'nashville' ? 2 : 1
+  const missingAlternates = requiredAlternates - car.tyreSets.filter(set => set.compound === 'alternate' && set.completedLaps >= 2).length
+  const compoundDue = config.championship === 'indycar' && config.weather === 'dry' && (config.course.kind === 'road' || config.course.kind === 'street' || config.course.id === 'nashville') && config.format.kind === 'laps' && config.format.laps >= 6 && missingAlternates > 0 && car.tyreSets.at(-1)!.completedLaps >= 2 && config.format.laps - car.laps <= missingAlternates * 4 + 2
+  const gtShareDue = config.championship === 'super-gt' && (config.format.kind === 'laps'
+    ? car.driverDistanceM[car.driverIndex] >= Math.max(0, config.format.laps * 2 / 3 - 2) * config.course.lengthM
+    : car.driverSeconds[car.driverIndex] >= config.format.seconds * 2 / 3 - 180)
+  const windowDue = config.championship === 'wec' && config.course.id === 'le-mans' && drivingTimeInWindow(car, car.driverIndex, car.activeDrivingEnd - 21600, car.activeDrivingEnd) >= 14220
+  const totalDue = config.maximumDriverSeconds !== null && car.driverSeconds[car.driverIndex] >= config.maximumDriverSeconds - 180
+  if (car.fuelKg > fuelReserve && (car.virtualEnergyMj === null || car.virtualEnergyMj > energyReserve) && !stintDue && !tyresDue && !gtShareDue && !windowDue && !totalDue && !compoundDue) return null
+  const crew = entry.drivers
+  let nextDriverIndex: number | null = null
+  if (crew.length > 1) nextDriverIndex = car.driverSeconds.indexOf(Math.min(...car.driverSeconds))
+  return { entryId: car.entryId, fuelFraction: 1, changeTyres: car.tyreLife < 0.65 || compoundDue, nextDriverIndex }
+}
+
+export function drivingTimeInWindow(car: MotorsportCar, driverIndex: number, start: number, end: number) {
+  return car.drivingStints.reduce((seconds, stint) => seconds + (stint.driverIndex === driverIndex ? Math.max(0, Math.min(end, stint.end) - Math.max(start, stint.start)) : 0), 0) + (car.activeDrivingStart !== null && car.driverIndex === driverIndex ? Math.max(0, Math.min(end, car.activeDrivingEnd) - Math.max(start, car.activeDrivingStart)) : 0)
+}
+
+function closeDrivingStint(car: MotorsportCar, end = car.activeDrivingEnd) {
+  if (car.activeDrivingStart !== null) car.drivingStints = [...car.drivingStints, { driverIndex: car.driverIndex, start: car.activeDrivingStart, end: Math.max(car.activeDrivingStart, end) }]
+  car.activeDrivingStart = null
+}
+
+/** Findings preserve steward discretion instead of inventing an automatic penalty. */
+export function motorsportCrewAudit(car: MotorsportCar, config: MotorsportRaceConfig): string[] {
+  const entry = config.entries.find(item => item.id === car.entryId)!
+  const findings: string[] = []
+  if (config.championship === 'indycar' && config.weather === 'dry' && (config.course.kind === 'road' || config.course.kind === 'street' || config.course.id === 'nashville')) {
+    const primary = car.tyreSets.filter(set => set.compound === 'primary' && set.completedLaps >= 2).length
+    const alternate = car.tyreSets.filter(set => set.compound === 'alternate' && set.completedLaps >= 2).length
+    if (primary < 1 || alternate < (config.course.kind === 'street' || config.course.id === 'nashville' ? 2 : 1)) findings.push('INDYCAR rules 15.3.3.2 / 15.3.6.3: required primary/alternate sets did not each complete two laps; steward review required (wet-condition exceptions apply).')
+  }
+  if (config.championship === 'super-gt') {
+    if (car.driverSeconds.filter(seconds => seconds > 0).length < 2) findings.push('SUPER GT: two drivers must participate; steward review required.')
+    const share = config.format.kind === 'laps' ? car.driverDistanceM.map(metres => metres / Math.max(1, car.driverDistanceM.reduce((a, b) => a + b, 0))) : car.driverSeconds.map(seconds => seconds / (config.format.kind === 'time' ? config.format.seconds : 1))
+    if (share.some(value => value > 2 / 3 + 0.0001)) findings.push('SUPER GT: driver exceeded the two-thirds distance/time share; steward review required.')
+  }
+  if (config.championship === 'wec') {
+    const leMans = config.course.id === 'le-mans'
+    entry.drivers.forEach((driver, index) => {
+      const seconds = car.driverSeconds[index]
+      if (seconds === 0) findings.push(`${driver.name}: did not drive; disqualification subject to steward force-majeure decision.`)
+      if (seconds < (leMans ? 3600 : 2700)) findings.push(`${driver.name}: below championship-points driving-time threshold.`)
+      const graded = driver.fiaGrade === 'B' || driver.fiaGrade === 'S'
+      const minimum = leMans ? 21600 : 6300
+      const anotherSilverQualified = driver.fiaGrade === 'S' && entry.drivers.some((other, otherIndex) => otherIndex !== index && other.fiaGrade === 'S' && car.driverSeconds[otherIndex] >= minimum)
+      if (graded && !anotherSilverQualified && entry.classId !== 'hypercar' && seconds < minimum) findings.push(`${driver.name}: below published Bronze/Silver minimum; steward review required.`)
+      if (leMans && graded && entry.classId !== 'hypercar' && seconds > 50400) findings.push(`${driver.name}: exceeded 14-hour maximum; steward review required.`)
+      if (leMans && car.drivingStints.some(stint => drivingTimeInWindow(car, index, stint.end - 21600, stint.end) > 14400.1)) findings.push(`${driver.name}: exceeded four driving hours in a six-hour window.`)
+    })
+  }
+  if (config.minimumDriverSeconds !== null && car.driverSeconds.some(seconds => seconds < config.minimumDriverSeconds!)) findings.push('User driver minimum not met.')
+  if (config.maximumDriverSeconds !== null && car.driverSeconds.some(seconds => seconds > config.maximumDriverSeconds!)) findings.push('User driver maximum exceeded.')
+  return findings
+}
+
+export function requestMotorsportPit(state: MotorsportRaceState, request: MotorsportPitRequest, config: MotorsportRaceConfig): MotorsportRaceState {
+  const entry = config.entries.find(item => item.id === request.entryId)
+  if (!entry) throw new Error('Unknown pit-request car')
+  if (!Number.isFinite(request.fuelFraction) || request.fuelFraction < 0 || request.fuelFraction > 1) throw new Error('Invalid refuel target')
+  if (request.nextDriverIndex !== null && (!Number.isInteger(request.nextDriverIndex) || request.nextDriverIndex < 0 || request.nextDriverIndex >= entry.drivers.length)) throw new Error('Unknown replacement driver')
+  if (config.championship === 'kyojo' && (request.fuelFraction > 0 || request.nextDriverIndex !== null)) throw new Error('KYOJO has no routine refuelling or crew changes')
+  return { ...state, cars: state.cars.map(car => car.entryId === request.entryId && car.status === 'running' ? { ...car, pitRequest: { ...request } } : car) }
+}
+
+export function setMotorsportFlag(state: MotorsportRaceState, flag: MotorsportRaceState['flag'], durationSeconds: number | null = null): MotorsportRaceState {
+  if (durationSeconds !== null && (!(durationSeconds > 0) || !Number.isFinite(durationSeconds))) throw new Error('Invalid neutralisation duration')
+  const cars = flag === 'red' ? state.cars.map(car => { const next = { ...car }; closeDrivingStint(next); return next }) : state.cars
+  return { ...state, cars, flag, flagUntil: durationSeconds === null ? null : state.raceSeconds + durationSeconds,
+    events: [...state.events.slice(-499), { tick: state.tick, seconds: state.raceSeconds, entryId: null, message: `Race director: ${flag.toUpperCase()}` }] }
+}
+
+/** Passing prepares a physically close train for the actual faster car. */
+function yieldingCars(state: MotorsportRaceState, config: MotorsportRaceConfig, physicalOrder: MotorsportCar[]): Set<string> {
+  const yielding = new Set<string>()
+  if (state.flag !== 'green' || config.championship === 'indycar') return yielding
+  const length = config.course.lengthM
+  const classFor = new Map(config.entries.map(entry => [entry.id, entry.classId]))
+  physicalOrder.forEach((overtaker, index) => {
+    let tail = -1
+    const reach = Math.max(140, overtaker.speedMps * 4)
+    // The sorted circular road order lets us stop beyond the approach window,
+    // rather than filter and sort the whole field separately for each car.
+    for (let offset = 1; offset < physicalOrder.length; offset++) {
+      const car = physicalOrder[(index + offset) % physicalOrder.length]
+      const gap = modulo(car.distanceM - overtaker.distanceM, length)
+      if (gap > reach) break
+      if (gap <= 0 || overtaker.speedMps <= car.speedMps + 2 ||
+        (overtaker.distanceM - car.distanceM < length * 0.8 && classFor.get(overtaker.entryId) === classFor.get(car.entryId))) continue
+      if (tail < 0 ? gap <= Math.max(70, overtaker.speedMps * 1.5) : gap - tail < 55) {
+        yielding.add(car.entryId); tail = gap
+      }
+    }
+  })
+  return yielding
+}
+
+function advanceTick(previous: MotorsportRaceState, config: MotorsportRaceConfig): MotorsportRaceState {
+  const dt = MOTORSPORT_STEP_SECONDS, length = config.course.lengthM
+  const state: MotorsportRaceState = { ...previous, tick: previous.tick + 1, events: [...previous.events] }
+  if (previous.phase === 'formation') {
+    state.formationSeconds = previous.formationSeconds + dt
+    if (state.formationSeconds + 1e-8 >= length / (80 / 3.6)) {
+      state.phase = 'racing'
+      appendEvent(state, null, config.start === 'rolling' ? 'GREEN. Rolling start; formation lap excluded from racing distance.' : 'GREEN. Standing start.')
+    }
+    return state
+  }
+  state.raceSeconds = Math.round((previous.raceSeconds + dt) * 10) / 10
+  if (state.flagUntil !== null && state.raceSeconds >= state.flagUntil) {
+    state.flag = 'green'; state.flagUntil = null; appendEvent(state, null, 'GREEN. Neutralisation ends.')
+  }
+  if (state.flag === 'red') return state
+  const entries = new Map(config.entries.map(entry => [entry.id, entry]))
+  const physicalOrder = previous.cars.filter(car => car.status === 'running')
+    .sort((a, b) => modulo(a.distanceM, length) - modulo(b.distanceM, length) || a.entryId.localeCompare(b.entryId))
+  const yields = yieldingCars(previous, config, physicalOrder)
+  const nearestAhead = new Map<string, { car: MotorsportCar; gap: number }>()
+  if (physicalOrder.length > 1) physicalOrder.forEach((car, index) => {
+    const next = physicalOrder[(index + 1) % physicalOrder.length]
+    nearestAhead.set(car.entryId, { car: next, gap: modulo(next.distanceM - car.distanceM, length) })
+  })
+  const leadLapBefore = Math.max(...previous.cars.map(car => car.laps))
+  const crossings: { entryId: string; time: number; laps: number }[] = []
+  state.cars = previous.cars.map(old => {
+    if (!RUNNING.has(old.status)) return old
+    const car: MotorsportCar = { ...old, driverSeconds: [...old.driverSeconds], driverLastOutSeconds: [...old.driverLastOutSeconds], driverDistanceM: [...old.driverDistanceM], warnings: [...old.warnings] }
+    const entry = entries.get(car.entryId)!, machine = entry.machine, driver = entry.drivers[car.driverIndex]
+    const beforeDistance = car.distanceM
+    if (car.status !== 'running') {
+      car.speedMps = car.status === 'pit-service' ? 0 : config.course.pitSpeedKph.value / 3.6
+      if (car.status === 'pit-service') {
+        const work = car.stopWork!
+        const elapsed = work.totalSeconds - car.pitServiceRemaining
+        const docking = config.championship === 'wec' && car.virtualEnergyMj !== null ? 2 : 0
+        const fillingSeconds = Math.max(0.001, work.fuelSeconds - docking)
+        const fractionBefore = clamp((elapsed - docking) / fillingSeconds, 0, 1)
+        const fractionAfter = clamp((elapsed + dt - docking) / fillingSeconds, 0, 1)
+        const fuelThisTick = work.fuelAddedKg * (fractionAfter - fractionBefore)
+        car.fuelKg += fuelThisTick; car.fuelAddedKg += fuelThisTick
+        if (car.virtualEnergyMj !== null) car.virtualEnergyMj += work.energyAddedMj * (fractionAfter - fractionBefore)
+        car.pitServiceRemaining = Math.max(0, car.pitServiceRemaining - dt)
+        if (car.pitServiceRemaining === 0) {
+          const request = car.pitRequest!
+          if (request.changeTyres) {
+            car.tyreLife = 1; car.tyreTemperatureC = 55
+            const needsAlternate = config.championship === 'indycar' && (config.course.kind === 'road' || config.course.kind === 'street' || config.course.id === 'nashville') && car.tyreSets.filter(set => set.compound === 'alternate' && set.completedLaps >= 2).length < (config.course.kind === 'street' || config.course.id === 'nashville' ? 2 : 1)
+            car.tyreSets = [...car.tyreSets, { compound: config.weather === 'wet' ? 'wet' : needsAlternate ? 'alternate' : 'primary', completedLaps: 0 }]
+          }
+          if (request.nextDriverIndex !== null && request.nextDriverIndex !== car.driverIndex) {
+            car.driverLastOutSeconds[car.driverIndex] = state.raceSeconds
+            car.driverIndex = request.nextDriverIndex
+            appendEvent(state, car.entryId, `Driver change: ${entry.drivers[car.driverIndex].name}`)
+          }
+          if (work.fuelAddedKg > 0) car.lastRefuelLap = car.laps
+          car.status = 'pit-exit'; car.pitRequest = null; car.stintSeconds = 0
+        }
+      } else {
+        const step = car.speedMps * dt
+        car.pitPathM += step
+        const pitArc = modulo(config.course.pitExit.value - config.course.pitEntry.value, 1) * length
+        car.distanceM += step / config.course.pitLengthM.value * pitArc
+        if (car.status === 'pit-entry' && car.pitPathM >= config.course.pitLengthM.value * 0.5) {
+          const work = pitWork(config, car, entry, car.pitRequest!)
+          car.status = 'pit-service'; car.speedMps = 0; car.pitServiceRemaining = work.total
+          car.stopWork = { fuelSeconds: work.fuelSeconds, tyreSeconds: work.tyreSeconds, driverSeconds: work.driverSeconds,
+            totalSeconds: work.total, fuelAddedKg: work.fuelAddedKg, energyAddedMj: work.energyAdded }
+          car.pits++; appendEvent(state, car.entryId, `Pit service: fuel ${work.fuelAddedKg.toFixed(1)} kg; ${work.total.toFixed(1)} s`)
+        } else if (car.status === 'pit-exit' && car.pitPathM >= config.course.pitLengthM.value) {
+          car.status = 'running'; car.pitPathM = 0; car.stopWork = null
+          appendEvent(state, car.entryId, 'Pit exit.')
+        }
+      }
+    } else {
+      car.pitRequest ??= requestForStrategy(config, entry, car)
+      car.driverSeconds[car.driverIndex] += dt; car.stintSeconds += dt
+      if (car.activeDrivingStart === null) car.activeDrivingStart = previous.raceSeconds
+      car.activeDrivingEnd = state.raceSeconds
+      const paceSkill = driver.racePace ?? 0.75
+      const tyreSkill = driver.tyreManagement ?? 0.75
+      const compoundGrip = car.tyreSets.at(-1)?.compound === 'alternate' ? 1.03 : 1
+      const surfaceGrip = (config.weather === 'wet' ? 0.73 : 1) * compoundGrip
+      let target = targetSpeedMps(config.course, machine, car.distanceM) * (0.95 + paceSkill * 0.05) * Math.sqrt(surfaceGrip) * (0.9 + car.tyreLife * 0.1)
+      if (state.flag === 'fcy') target = Math.min(target, 80 / 3.6)
+      if (state.flag === 'yellow') target *= 0.7
+      if (state.flag === 'sc') target = Math.min(target, 100 / 3.6)
+      const ahead = nearestAhead.get(car.entryId)
+      car.blueFlag = yields.has(car.entryId)
+      const overtaking = ahead && state.flag === 'green' && (car.speedMps > ahead.car.speedMps + 0.5 || car.distanceM - ahead.car.distanceM >= length * 0.8)
+      const desiredLateral = car.blueFlag ? config.course.widthM.value / 2 - 1.5 : overtaking ? -2.2 : 0
+      car.lateralM += clamp(desiredLateral - car.lateralM, -2.5 * dt, 2.5 * dt)
+      if (ahead && (state.flag !== 'green' || Math.abs(car.lateralM - ahead.car.lateralM) < 2.1)) {
+        if (ahead.gap < Math.max(7, car.speedMps * 0.5)) target = Math.min(target, Math.max(0, ahead.car.speedMps + (ahead.gap - 7) * 0.5))
+      }
+      const mass = machine.massKg.value + machine.driverMassKg.value + car.fuelKg
+      const drag = 0.5 * 1.225 * machine.dragAreaM2.value * car.speedMps ** 2
+      let powerKw = machine.powerKw.value
+      const hybrid = state.flag === 'green' && car.speedMps > 25 && target > car.speedMps && car.hybridEnergyMj > 0
+        ? Math.min(machine.hybridPowerKw.value, car.hybridEnergyMj * 1000 / dt) : 0
+      // Hypercar's electrical contribution remains inside the combined cap.
+      if (entry.classId === 'indycar') powerKw += hybrid
+      if (overtaking && car.pushToPassSeconds > 0 && entry.classId === 'indycar') {
+        powerKw += 45; car.pushToPassSeconds = Math.max(0, car.pushToPassSeconds - dt)
+      }
+      const force = Math.min(machine.tyreMu.value * mass * 9.80665 * surfaceGrip,
+        powerKw * 1000 * 0.94 / Math.max(8, car.speedMps)) - drag - 0.015 * mass * 9.80665
+      const braking = machine.tyreMu.value * 9.80665 * surfaceGrip * (1 + 0.5 * 1.225 * machine.liftAreaM2.value * car.speedMps ** 2 / (mass * 9.80665))
+      const acceleration = target < car.speedMps ? Math.max(-braking, (target - car.speedMps) / dt) : force / mass
+      const nextSpeed = Math.max(0, car.speedMps + acceleration * dt)
+      const unconstrainedStep = (car.speedMps + nextSpeed) * 0.5 * dt
+      // Neutralisation applies regardless of lateral lane. Integrate up to the
+      // preceding car's safe rear envelope without changing lap identity.
+      const distanceStep = ahead && state.flag !== 'green'
+        ? Math.min(unconstrainedStep, Math.max(0, ahead.gap + ahead.car.speedMps * dt - 6))
+        : unconstrainedStep
+      car.speedMps = nextSpeed; car.distanceM += distanceStep
+      car.driverDistanceM[car.driverIndex] += distanceStep
+      const fuelUsed = machine.fuelKgPerKm.value * distanceStep / 1000 * (acceleration < -1 ? 0.35 : 0.85 + 0.15 * Math.min(1, Math.max(0, acceleration) / 4))
+      car.fuelKg = Math.max(0, car.fuelKg - fuelUsed)
+      const deliveredPowerKw = Math.max(0, (mass * acceleration + drag + 0.015 * mass * 9.80665) * car.speedMps / 1000)
+      if (car.virtualEnergyMj !== null) {
+        const beforeEnergy = car.virtualEnergyMj
+        car.virtualEnergyMj -= deliveredPowerKw * dt / 1000
+        if (beforeEnergy >= 0 && car.virtualEnergyMj < 0) {
+          car.warnings.push('Virtual-energy allowance exceeded; deficit is replenished at next service, steward penalty requires review.')
+          appendEvent(state, car.entryId, 'Virtual-energy allowance exceeded. Steward review required; fuel remains a separate physical quantity.')
+        }
+      }
+      const regenerationMj = acceleration < -1 ? Math.min(60, -acceleration * mass * car.speedMps / 1000 * 0.3) * dt / 1000 : 0
+      car.hybridEnergyMj = clamp(car.hybridEnergyMj + regenerationMj - hybrid * dt / 1000, 0, machine.hybridCapacityMj.value)
+      car.hybridDeployedMj += hybrid * dt / 1000
+      car.tyreLife = Math.max(0, car.tyreLife - distanceStep / 1000 / (80 + tyreSkill * 180) * (config.weather === 'wet' ? 0.7 : car.tyreSets.at(-1)?.compound === 'alternate' ? 1.4 : 1))
+      car.tyreTemperatureC += (car.speedMps > 15 ? 90 - car.tyreTemperatureC : 35 - car.tyreTemperatureC) * dt / 40
+      car.gear = clamp(Math.ceil(car.speedMps / Math.max(1, targetSpeedMps(config.course, machine, car.distanceM)) * machine.gears.value), 1, machine.gears.value)
+      if (car.pitRequest) {
+        const entryLine = (Math.floor(beforeDistance / length) + config.course.pitEntry.value) * length
+        const nextEntryLine = entryLine <= beforeDistance ? entryLine + length : entryLine
+        if (car.distanceM >= nextEntryLine) { car.distanceM = nextEntryLine; car.status = 'pit-entry'; car.pitPathM = 0; car.stintSeconds = 0; closeDrivingStint(car) }
+      }
+      if (car.fuelKg === 0) {
+        car.status = 'retired'; car.speedMps = 0
+        closeDrivingStint(car)
+        appendEvent(state, car.entryId, 'Retired: fuel exhausted.')
+      }
+    }
+    const completedBefore = Math.max(0, Math.floor(beforeDistance / length))
+    const completedAfter = Math.max(0, Math.floor(car.distanceM / length))
+    if (completedAfter > completedBefore) {
+      const currentSet = car.tyreSets.at(-1)!
+      car.tyreSets = [...car.tyreSets.slice(0, -1), { ...currentSet, completedLaps: currentSet.completedLaps + completedAfter - completedBefore }]
+      const fraction = clamp((completedAfter * length - beforeDistance) / Math.max(0.001, car.distanceM - beforeDistance), 0, 1)
+      const crossing = previous.raceSeconds + dt * fraction
+      const lapTime = crossing - car.lapStartedAt
+      car.lastLapSeconds = lapTime; car.bestLapSeconds = Math.min(car.bestLapSeconds ?? Infinity, lapTime)
+      car.lapStartedAt = crossing; car.laps = completedAfter
+      if (car.status === 'running') crossings.push({ entryId: car.entryId, time: crossing, laps: completedAfter })
+    }
+    return car
+  })
+  // Apply crossing events chronologically, independent of entry-list order.
+  for (const crossing of crossings.sort((a, b) => a.time - b.time || a.entryId.localeCompare(b.entryId))) {
+    const distanceOver = config.format.kind === 'laps' ? crossing.laps >= config.format.laps : crossing.time >= config.format.seconds
+    if (!state.leaderFinished && crossing.laps > leadLapBefore && distanceOver) {
+      state.leaderFinished = true; state.winnerId = crossing.entryId
+      appendEvent(state, crossing.entryId, 'CHEQUERED FLAG. Leader crossed the Line after the required distance/time.')
+    }
+    if (state.leaderFinished) {
+      const car = state.cars.find(item => item.entryId === crossing.entryId)!
+      car.status = 'finished'; car.finishTime = crossing.time; car.speedMps = 0
+      closeDrivingStint(car, crossing.time)
+      car.warnings = [...car.warnings, ...motorsportCrewAudit(car, config)]
+    }
+  }
+  if (state.cars.every(car => !RUNNING.has(car.status))) {
+    state.phase = 'finished'; appendEvent(state, null, 'Race finished. Class standings and driver times are available.')
+  }
+  return state
+}
+
+/** The engine accepts only integral fixed ticks, independent of display rate. */
+export function advanceMotorsportRace(state: MotorsportRaceState, ticks: number, config: MotorsportRaceConfig): MotorsportRaceState {
+  if (!Number.isSafeInteger(ticks) || ticks < 0) throw new Error('Expected a non-negative integer tick count')
+  let result = state
+  for (let index = 0; index < ticks && result.phase !== 'finished'; index++) result = advanceTick(result, config)
+  return result
+}
+export function motorsportStandings(state: MotorsportRaceState, config: MotorsportRaceConfig) {
+  const entries = new Map(config.entries.map(entry => [entry.id, entry]))
+  const classPositions = new Map<string, number>()
+  return [...state.cars].sort((a, b) => b.laps - a.laps ||
+    (a.finishTime !== null && b.finishTime !== null ? a.finishTime + a.penaltySeconds - b.finishTime - b.penaltySeconds : b.distanceM - a.distanceM) || a.entryId.localeCompare(b.entryId))
+    .map((car, index) => {
+      const entry = entries.get(car.entryId)!, position = (classPositions.get(entry.classId) ?? 0) + 1
+      classPositions.set(entry.classId, position)
+      return { car, entry, overallPosition: index + 1, classPosition: position }
+    })
+}

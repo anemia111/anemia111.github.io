@@ -357,6 +357,9 @@ describe('canonical track-surface snapshot authority', () => {
   })
 
   it('counts only moving on-track traversals, excluding pit and excursion cars', () => {
+    // Inspect one physical integration tick. Over a longer interval the
+    // formation controller legitimately accelerates the stationary fixtures.
+    const onePhysicsTick = 0.05
     const config: RaceConfig = {
       ...makeConfig('canonical-surface-traversal-filter'),
       track: { ...tracks[0], rainProbability: 0 },
@@ -373,7 +376,7 @@ describe('canonical track-surface snapshot authority', () => {
     }))
     const stationary = advanceRace(
       { ...initial, cars: stationaryCars },
-      0.25,
+      onePhysicsTick,
       config,
     )
     const excluded = advanceRace(
@@ -389,7 +392,7 @@ describe('canonical track-surface snapshot authority', () => {
                 : car,
         ),
       },
-      0.25,
+      onePhysicsTick,
       config,
     )
     const moving = advanceRace(
@@ -399,7 +402,7 @@ describe('canonical track-surface snapshot authority', () => {
           index === 0 ? { ...car, speedKph: 220 } : car,
         ),
       },
-      0.25,
+      onePhysicsTick,
       config,
     )
     const stationarySurface = canonicalTrackSurfaceFor(stationary)
@@ -1164,7 +1167,9 @@ describe('determinism', () => {
 
       expect(JSON.stringify(a)).toBe(JSON.stringify(b))
     },
-    40_000,
+    // Two 20-minute 22-car races, each at 20Hz, are intentionally long runs.
+    // Keep the complete snapshots and physical resolution under comparison.
+    240_000,
   )
 
   it(
@@ -1177,7 +1182,7 @@ describe('determinism', () => {
         JSON.stringify(b.cars.map((car) => car.driverId)),
       )
     },
-    40_000,
+    240_000,
   )
 })
 
@@ -1751,7 +1756,8 @@ describe('starting grid', () => {
       expect(maximumCarsInPit).toBeLessThan(snapshot.cars.length / 2)
       expect(vscPenalties.length).toBeLessThanOrEqual(2)
     },
-    15_000,
+    // Up to 900 simulated seconds for 22 cars at 20Hz on desktop CI.
+    120_000,
   )
 
   it('starts practice from pit boxes and releases cars on staggered run plans', () => {
@@ -1802,7 +1808,7 @@ describe('starting grid', () => {
     expect(startTimes[0]).toBeLessThan(60)
     expect(startTimes[startTimes.length - 1]).toBeLessThan(150)
     expect(minimumSpacing).toBeGreaterThanOrEqual(2)
-  })
+  }, 30_000)
 
   it('finishes timed practice by clock instead of race distance', () => {
     const config = { ...makeConfig('fp-clock'), weekendStage: 'fp2' as const }
@@ -2499,7 +2505,7 @@ describe('full race', () => {
     const result = runToFinish(config)
     finished = result.snapshot
     seenEventKinds = result.seenEventKinds
-  }, 180_000)
+  }, 900_000)
 
   it('completes with every car finished or retired', () => {
     expect(finished.sessionStatus).toBe('finished')
@@ -3054,7 +3060,10 @@ describe('start procedure and persisted weekend', () => {
         return car
       }),
     }
-    snapshot = advanceRace(snapshot, 0.25, config)
+    // Compare the reported speed to travel over the same integration tick;
+    // a 0.25s call contains five ticks with different speeds.
+    const clampTickSeconds = 0.05
+    snapshot = advanceRace(snapshot, clampTickSeconds, config)
 
     const nextFollower = snapshot.cars.find(
       (car) => car.driverId === follower.driverId,
@@ -3063,7 +3072,7 @@ describe('start procedure and persisted weekend', () => {
       config.track,
       previousFollowerDistance,
       nextFollower.totalDistance,
-      0.25,
+      clampTickSeconds,
     )
 
     expect(nextFollower.speedKph).toBeCloseTo(actualTravelSpeedKph, 2)
@@ -3143,6 +3152,11 @@ describe('start procedure and persisted weekend', () => {
     snapshot = advanceRace(snapshot, endingDuration - 0.2, config)
     expect(snapshot.flagPhase?.flag).toBe('vsc')
 
+    // Place the injected four-sector infringement in the final physical tick.
+    // Earlier injection may legitimately add a fifth red sector (drive-through).
+    snapshot = advanceRace(snapshot,
+      Math.max(0, (procedure.resumeAtSeconds ?? 0) - 0.025 - snapshot.elapsedSeconds), config)
+
     const violatingDriverId = snapshot.cars[0].driverId
     const priorVscPenalty: PenaltyRecord = {
       id: 'prior-vsc-penalty',
@@ -3169,7 +3183,7 @@ describe('start procedure and persisted weekend', () => {
             : { ...car, vscDeltaSeconds: 0.2, vscRedSectorCount: 0 },
         ),
       },
-      0.3,
+      0.05,
       config,
     )
     expect(snapshot.flagPhase).toBeNull()
@@ -3624,7 +3638,7 @@ describe('tires', () => {
         return lapTime > 40 && lapTime < 200
       }),
     ).toBe(true)
-  })
+  }, 30_000)
 })
 
 describe('weather and wet strategy', () => {

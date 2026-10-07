@@ -1275,7 +1275,7 @@ const openF1GridResultsFor = (
     )
 }
 
-export default function App() {
+export default function App({ onOpenMotorsport }: { onOpenMotorsport?: (championship: import('./motorsport/types').ChampionshipId) => void }) {
   const [applicationMode, setApplicationMode] =
     useState<ApplicationMode>('championship')
   const [activeFreeModeRuntime, setActiveFreeModeRuntime] =
@@ -4244,6 +4244,7 @@ export default function App() {
         }
         onPauseChange={() => setIsPaused((paused) => !paused)}
         onSeriesChange={changeSeries}
+        onOpenMotorsport={onOpenMotorsport}
         onSkipFormationLap={skipFormationLap}
         onSpeedChange={setSpeed}
         onStageChange={jumpToWeekendStage}

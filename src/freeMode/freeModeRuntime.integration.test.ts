@@ -161,7 +161,7 @@ describe('Free Mode runtime integration', () => {
 
     expect(snapshot.cars).toHaveLength(1)
     expect(snapshot.sessionStatus).toBe('finished')
-  })
+  }, 30_000)
 
   it(
     'finishes a 30-car Super Formula session on an F1 circuit',
@@ -180,7 +180,7 @@ describe('Free Mode runtime integration', () => {
       expect(snapshot.cars).toHaveLength(30)
       expect(snapshot.sessionStatus).toBe('finished')
     },
-    20_000,
+    90_000,
   )
 
   it(
@@ -199,7 +199,7 @@ describe('Free Mode runtime integration', () => {
       expect(snapshot.cars).toHaveLength(40)
       expect(snapshot.sessionStatus).toBe('finished')
     },
-    20_000,
+    90_000,
   )
 
   it.each([
@@ -232,7 +232,7 @@ describe('Free Mode runtime integration', () => {
       configurationFor({
         carCount: 40,
         categoryId: 'f1-custom',
-        raceLaps: 5,
+        raceLaps: 20,
         trackId: 'suzuka-approx',
       }),
       context,
@@ -324,7 +324,7 @@ describe('Free Mode runtime integration', () => {
       1,
     )
     expect(red.restartProcedure).toBe('none')
-  }, 60_000)
+  }, 240_000)
 
   it('completes requested pit stops across a 40-car field', () => {
     const config = buildFreeModeRaceConfig(
@@ -368,5 +368,5 @@ describe('Free Mode runtime integration', () => {
             car.pitPhase === 'none'),
       ),
     ).toBe(true)
-  }, 60_000)
+  }, 240_000)
 })

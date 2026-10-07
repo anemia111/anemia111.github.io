@@ -1,3 +1,17 @@
+# 2026 expansion — current runnable release
+
+KYOJO, SUPER GT (GT500/GT300), WEC (including the 62-car Le Mans grid), and
+INDYCAR are executable from Racing series. All 30 distinct courses have closed
+geometry. The technical reference catalogue contains 43 records. User-supplied
+driver ratings are preserved.
+
+See [the current runtime guide](motorsport-2026-runtime.md) for event-specific
+entries, physical assumptions, official references, controls, sporting-rule
+coverage and known limitations. The notes below document the earlier foundation
+checkpoint and are retained as implementation history, not current readiness.
+
+---
+
 # 2026 machine and course expansion — implementation status
 
 This is an in-progress expansion. F1 and SUPER FORMULA remain the only

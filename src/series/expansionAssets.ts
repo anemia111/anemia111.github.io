@@ -66,7 +66,7 @@ export type ExpansionCourseAsset = {
   publishedLengthMeters: number | null
   measuredLengthMeters: number | null
   sourceUrl: string | null
-  geometryStatus: 'existing-pack' | 'osm-centerline' | 'unavailable'
+  geometryStatus: 'existing-pack' | 'osm-centerline' | 'official-map-trace' | 'unavailable'
   notes: string
 }
 const existingTracks = new Map([...tracks, ...supportSeriesTracks].map((track) => [track.id, track]))
@@ -92,7 +92,7 @@ export function courseAssetsFor(categoryId: string): ExpansionCourseAsset[] {
     if (layout) return {
       id, name: event.trackName, centerline: layout.centerlineMeters as Array<[number, number]>,
       publishedLengthMeters: layout.publishedLengthMeters, measuredLengthMeters: layout.measuredLengthMeters,
-      sourceUrl: layout.lengthSourceUrl, geometryStatus: 'osm-centerline' as const, notes: layout.notes,
+      sourceUrl: layout.geometrySourceUrl, geometryStatus: 'geometryBasis' in layout && layout.geometryBasis === 'official-map-trace' ? 'official-map-trace' as const : 'osm-centerline' as const, notes: layout.notes,
     }
     return { id, name: event.trackName, centerline: [], publishedLengthMeters: null,
       measuredLengthMeters: null, sourceUrl: null, geometryStatus: 'unavailable' as const,

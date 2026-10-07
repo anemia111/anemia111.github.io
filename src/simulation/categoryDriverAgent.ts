@@ -130,9 +130,16 @@ const scalarObservationValue = (
     : undefined
 }
 
+// Inbox arrays are immutable snapshots. Most physics ticks reuse the same
+// retained array, and the controller may receive an already-reduced array.
+// Weak keys preserve the exact causal selection without retaining old races.
+const causalObservationCache = new WeakMap<readonly DriverObservation[], readonly DriverObservation[]>()
+
 export function latestCausalDriverObservations(
   observations: readonly DriverObservation[],
 ): readonly DriverObservation[] {
+  const cached = causalObservationCache.get(observations)
+  if (cached) return cached
   const latestBySignal = new Map<string, DriverObservation>()
   for (const observation of observations) {
     const key = `${observation.scope}/${observation.signalId}/${
@@ -148,9 +155,12 @@ export function latestCausalDriverObservations(
       latestBySignal.set(key, observation)
     }
   }
-  return [...latestBySignal.values()].sort((left, right) =>
+  const result = [...latestBySignal.values()].sort((left, right) =>
     left.observationId < right.observationId ? -1 : 1,
   )
+  causalObservationCache.set(observations, result)
+  causalObservationCache.set(result, result)
+  return result
 }
 
 /**

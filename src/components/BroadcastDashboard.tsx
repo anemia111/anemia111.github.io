@@ -135,6 +135,7 @@ type BroadcastDashboardProps = {
   onOpenSetup: () => void
   onPauseChange: () => void
   onSeriesChange: (seriesId: SeriesId) => void
+  onOpenMotorsport?: (championship: import('../motorsport/types').ChampionshipId) => void
   onSkipFormationLap: () => void
   onSpeedChange: (speed: SpeedMultiplier) => void
   onStageChange: (stage: WeekendStage) => void
@@ -679,6 +680,7 @@ export function BroadcastDashboard({
   onOpenSetup,
   onPauseChange,
   onSeriesChange,
+  onOpenMotorsport,
   onSkipFormationLap,
   onSpeedChange,
   onStageChange,
@@ -779,12 +781,17 @@ export function BroadcastDashboard({
             aria-label="Racing series"
             className="broadcast-series-select"
             disabled={applicationMode === 'free'}
-            onChange={(event) => onSeriesChange(event.target.value as SeriesId)}
+            onChange={(event) => {
+              const value = event.target.value
+              if (value.startsWith('motorsport:')) onOpenMotorsport?.(value.slice(11) as import('../motorsport/types').ChampionshipId)
+              else onSeriesChange(value as SeriesId)
+            }}
             value={seriesId}
           >
             {seriesOptions.map((series) => (
               <option key={series.id} value={series.id}>{series.label}</option>
             ))}
+            {onOpenMotorsport && <optgroup label="2026 MOTORSPORT"><option value="motorsport:kyojo">KYOJO CUP</option><option value="motorsport:super-gt">SUPER GT</option><option value="motorsport:wec">FIA WEC</option><option value="motorsport:indycar">INDYCAR</option></optgroup>}
           </select>
         </div>
         <div className="broadcast-session-core">

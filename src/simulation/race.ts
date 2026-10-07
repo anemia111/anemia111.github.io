@@ -3200,7 +3200,13 @@ export function advanceRace(
 
   const teams = byId(config.teams)
   const drivers = byId(config.drivers)
-  const elapsedSeconds = snapshot.elapsedSeconds + deltaSeconds
+  // Repeated 50ms substeps can land a few ulps below a phase boundary.
+  // Snap only that numerical residue, preserving the requested clock interval.
+  const rawElapsedSeconds = snapshot.elapsedSeconds + deltaSeconds
+  const formationEnd = snapshot.formationLapDurationSeconds * snapshot.formationLapsPlanned
+  const elapsedSeconds = Math.abs(rawElapsedSeconds - formationEnd) < 1e-9
+    ? formationEnd
+    : rawElapsedSeconds
   const raceLaps = snapshot.raceLaps
   const baseLapTime = config.track.baseLapTime
   const categoryPhysics = categoryPhysicsFor(config.seriesId)
@@ -6110,7 +6116,11 @@ export function advanceRace(
     const paceMultiplier = flagPaceMultiplier(localControlPhase, carSector, {
       carProgress: car.progress,
       isLeader: car.position === 1,
-      gapToAheadSeconds: car.gapToAhead,
+      // Safety-car catch-up follows the car physically ahead. Timing-line
+      // gaps can be stale or absent while a 40-car field forms its queue.
+      gapToAheadSeconds: localControlPhase?.flag === 'sc'
+        ? physicalGapSecondsById.get(car.driverId) ?? Number.POSITIVE_INFINITY
+        : car.gapToAhead,
     })
     const localFlagPaceScale =
       localControlPhase?.flag === 'yellow'

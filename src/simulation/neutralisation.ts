@@ -248,6 +248,7 @@ export function isSafetyCarFieldQueued(
   cars: CarSnapshot[],
   referenceLapTimeSeconds: number,
   maximumQueueGapCarLengths: 10 | 20 = 10,
+  trackLengthMeters?: number,
 ) {
   const running = runningOnTrackCars(cars)
 
@@ -255,9 +256,13 @@ export function isSafetyCarFieldQueued(
     return running.length === 1
   }
 
-  const maximumGapLaps =
-    (SAFETY_CAR_QUEUE_GAP_SECONDS * (maximumQueueGapCarLengths / 10)) /
-    Math.max(45, referenceLapTimeSeconds)
+  // Ten car lengths are a physical distance, not a fraction of the live
+  // projected lap time. Under SC that lap time grows and the old threshold
+  // could become shorter than the following controller's safe gap.
+  const maximumGapLaps = trackLengthMeters && trackLengthMeters > 0
+    ? maximumQueueGapCarLengths * 5.6 / trackLengthMeters
+    : (SAFETY_CAR_QUEUE_GAP_SECONDS * (maximumQueueGapCarLengths / 10)) /
+      Math.max(45, referenceLapTimeSeconds)
 
   return running.slice(1).every((car, index) => {
     const ahead = running[index]
@@ -877,6 +882,7 @@ function advanceSafetyCar(
       cars,
       leader.projectedLapTime,
       procedure.maximumQueueGapCarLengths,
+      track.lengthKm * 1000,
     )
   ) {
     procedure = {

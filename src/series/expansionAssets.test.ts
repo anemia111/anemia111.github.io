@@ -57,7 +57,7 @@ describe('2026 machine and physical course assets', () => {
   })
 
   it('uses connected surveyed loops and checks measured lengths without forcing them to match', () => {
-    expect(layouts.layouts).toHaveLength(17)
+    expect(layouts.layouts).toHaveLength(20)
     const sourceWays = snapshot.ways as Record<string, { points: number[][] }>
     for (const course of snapshot.courses) {
       let first = -1, tail = -1
@@ -89,7 +89,8 @@ describe('2026 machine and physical course assets', () => {
       courseAssetsFor(category.id).map((course) => [course.id, course] as const)))
     expect(assets.size).toBe(30)
     expect([...assets.values()].filter((asset) => asset.geometryStatus === 'existing-pack')).toHaveLength(10)
-    expect([...assets.values()].filter((asset) => asset.geometryStatus === 'unavailable').map((asset) => asset.id))
+    expect([...assets.values()].filter((asset) => asset.geometryStatus === 'unavailable')).toHaveLength(0)
+    expect([...assets.values()].filter((asset) => asset.geometryStatus === 'official-map-trace').map(asset => asset.id))
       .toEqual(['arlington', 'detroit', 'washington-dc'])
     const indy = courseAssetsFor('indycar')
     expect(indy).toHaveLength(17)

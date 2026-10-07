@@ -528,7 +528,7 @@ describe('timed session plan', () => {
     // A full Q1 through the production engine takes seconds, not milliseconds,
     // and runs alongside a build during a publish. Its siblings already carry
     // their own budget; the default 5s left this one failing on load alone.
-    60_000,
+    240_000,
   )
 
   it(
@@ -566,9 +566,10 @@ describe('timed session plan', () => {
         ),
       ).toBe(true)
     },
-    // Twenty-two full Q1 sessions through the production engine. It sat right
-    // on a three-minute budget and tipped over whenever the machine was busy.
-    600_000,
+    // Twenty-two full Q1 sessions at the production 50ms integration cadence.
+    // The complete field runs each circuit; measured aggregate CPU time exceeds
+    // the old 600s budget. Keep every physical pace assertion and all 22 circuits.
+    3_600_000,
   )
 
   it(

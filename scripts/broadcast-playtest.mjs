@@ -1226,15 +1226,15 @@ async function inspectExpansionCatalog(browser) {
     if (JSON.stringify(rowCounts) !== JSON.stringify([20, 14, 29, 33, 17, 18])) {
       throw new Error(`Expansion catalog incorrect directory counts: ${rowCounts}`)
     }
-    const expectedAssets = [[1, 1, 0], [3, 6, 0], [15, 6, 0], [6, 14, 3], [8, 8, 0], [9, 8, 0]]
+    const expectedAssets = [[1, 1, 0], [3, 6, 0], [15, 6, 0], [6, 17, 0], [8, 8, 0], [9, 8, 0]]
     if (JSON.stringify(assetCounts.map(({ machines, courseShapes, missingShapes }) => [machines, courseShapes, missingShapes])) !== JSON.stringify(expectedAssets)) {
       throw new Error(`Expansion machine/course assets missing: ${JSON.stringify(assetCounts)}`)
     }
-    if (!(await catalog.innerText()).includes('レース実行は未対応')) throw new Error('Catalog implies executable series')
+    if (!(await catalog.innerText()).includes('追加カテゴリー')) throw new Error('Catalog is missing runtime navigation guidance')
     await summaries.first().click()
     await catalog.locator('.expansion-machine').first().scrollIntoViewIfNeeded()
     await page.screenshot({ path: join(artifactDirectory, 'expansion-catalog.png') })
-    return { rowCounts, assetCounts, labelledUnavailable: true, noHorizontalOverflow: true }
+    return { rowCounts, assetCounts, allCourseShapesAvailable: true, noHorizontalOverflow: true }
   } finally {
     await page.close()
   }
