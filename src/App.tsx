@@ -1275,7 +1275,7 @@ const openF1GridResultsFor = (
     )
 }
 
-export default function App({ onOpenMotorsport }: { onOpenMotorsport?: (championship: import('./motorsport/types').ChampionshipId) => void }) {
+export default function App({ onOpenMotorsport, requestedSeriesId }: { requestedSeriesId?: SeriesId; onOpenMotorsport?: (championship: import('./motorsport/types').ChampionshipId) => void }) {
   const [applicationMode, setApplicationMode] =
     useState<ApplicationMode>('championship')
   const [activeFreeModeRuntime, setActiveFreeModeRuntime] =
@@ -3159,6 +3159,12 @@ export default function App({ onOpenMotorsport }: { onOpenMotorsport?: (champion
 
     activateChampionshipSeries(seriesId)
   }
+  useEffect(() => {
+    if (requestedSeriesId && requestedSeriesId !== selectedSeriesId) changeSeries(requestedSeriesId)
+    // Apply the category selected when returning to this engine.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requestedSeriesId])
+
 
   const startFreeMode = (configuration: FreeModeConfiguration) => {
     const runtime = buildFreeModeRuntime(configuration, {

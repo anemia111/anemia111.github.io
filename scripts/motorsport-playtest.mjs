@@ -20,8 +20,9 @@ try {
     await page.getByRole('combobox', { name: 'Racing series', exact: true }).selectOption('motorsport:kyojo')
     await page.getByTestId('motorsport-app').waitFor()
     for (const [championship, expected] of [['kyojo', 18], ['super-gt', 43], ['wec', 35], ['indycar', 25]]) {
-      await page.getByRole('combobox', { name: 'Motorsport championship', exact: true }).selectOption(championship)
-      const rows = page.getByRole('table', { name: 'Motorsport timing', exact: true }).locator('tbody tr')
+      await page.getByRole('combobox', { name: 'Racing series', exact: true }).selectOption(`motorsport:${championship}`)
+      await page.getByRole('button', { name: 'Open setup', exact: true }).click()
+      const rows = page.locator('.leaderboard-rows > li')
       await rows.first().waitFor()
       assert.equal(await rows.count(), expected, `${championship}: field size`)
       const allCourses = await page.getByRole('combobox', { name: 'Motorsport event', exact: true }).locator('option').evaluateAll(options => options.map(option => ({ value: option.value, disabled: option.disabled })))
@@ -29,10 +30,20 @@ try {
       await page.getByRole('combobox', { name: 'Motorsport distance kind', exact: true }).selectOption('laps')
       await page.getByRole('spinbutton', { name: 'Motorsport race distance', exact: true }).fill('1')
       await page.getByRole('combobox', { name: 'Motorsport simulation speed', exact: true }).selectOption('600')
-      await page.getByRole('button', { name: '走行開始', exact: true }).click()
+      await page.getByRole('button', { name: 'Close panel', exact: true }).click()
+      assert.equal(await page.locator('.broadcast-topbar').count(), 1)
+      assert.equal(await page.locator('.broadcast-footer').count(), 1)
+      assert.equal(await page.locator('.motorsport-layout').count(), 0)
+      const classes = await page.locator('.broadcast-class-leaderboards .broadcast-panel-header > div > strong').allTextContents()
+      if (championship === 'super-gt') assert.deepEqual(classes, ['GT500 Leaderboard','GT300 Leaderboard'])
+      if (championship === 'wec') assert.deepEqual(classes, ['HYPERCAR Leaderboard','LMGT3 Leaderboard'])
+      for (const heading of await page.locator('.broadcast-class-leaderboards .broadcast-leaderboard').all()) {
+        assert.equal(await heading.locator('.leaderboard-position').first().textContent(), '1')
+      }
+      await page.getByRole('button', { name: 'Resume simulation', exact: true }).click()
       console.log(`[motorsport-playtest] ${championship} ${viewport.width}: started`)
       try {
-        await page.waitForFunction(() => document.querySelector('.motorsport-phase')?.textContent?.includes('FINISHED'), null, { timeout: 60_000 })
+        await page.waitForFunction(() => document.querySelector('.broadcast-phase-label')?.textContent?.includes('FINISHED'), null, { timeout: 60_000 })
       } catch (error) {
         console.log(JSON.stringify({ championship, viewport, errors, text: (await page.locator('body').innerText()).slice(0, 7000) }))
         await page.screenshot({ path: join(artifacts, `motorsport-failure-${championship}-${viewport.width}.png`), fullPage: true })
@@ -44,7 +55,9 @@ try {
       await page.screenshot({ path: join(artifacts, `motorsport-${championship}-${viewport.width}.png`), fullPage: true })
       reports.push({ championship, viewport, cars: expected, events: allCourses.length, finished: true, layout })
       if (championship === 'wec') {
+        await page.getByRole('button', { name: 'Open setup', exact: true }).click()
         await page.getByRole('combobox', { name: 'Motorsport event', exact: true }).selectOption('wec:3')
+        assert.deepEqual(await page.locator('.broadcast-class-leaderboards .broadcast-panel-header > div > strong').allTextContents(), ['HYPERCAR Leaderboard','LMP2 Leaderboard','LMGT3 Leaderboard'])
         assert.equal(await rows.count(), 62)
         const savePromise = page.waitForEvent('download')
         await page.getByRole('button', { name: 'JSON保存', exact: true }).click()
@@ -52,9 +65,12 @@ try {
         await (await savePromise).saveAs(savePath)
         await page.getByLabel('Import motorsport race', { exact: true }).setInputFiles(savePath)
         assert.equal(await rows.count(), 62)
+        await page.getByRole('button', { name: 'Close panel', exact: true }).click()
       }
     }
-    await page.getByRole('button', { name: 'F1 / SUPER FORMULA', exact: true }).click()
+    await page.getByRole('combobox', { name: 'Racing series', exact: true }).selectOption('super-formula')
+    await page.waitForFunction(() => document.querySelector('[aria-label="Racing series"]')?.value === 'super-formula')
+    await page.getByRole('combobox', { name: 'Racing series', exact: true }).selectOption('f1-custom')
     await page.getByRole('combobox', { name: 'Racing series', exact: true }).waitFor()
     await page.close()
   }

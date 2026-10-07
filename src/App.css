@@ -4066,3 +4066,6 @@
 .expansion-course-grid svg { display: block; width: 100%; height: 180px; color: #75d8c2; }
 .expansion-course-grid figcaption > * { display: block; margin-top: 5px; }
 .expansion-course-unavailable { min-height: 180px; display: grid; place-content: center; color: #aab3c2; }
+
+.broadcast-class-leaderboards { display: flex; flex-direction: column; gap: 6px; min-height: 0; overflow: hidden; }
+.broadcast-class-leaderboards > .broadcast-leaderboard { flex: 1; min-height: 0; }
