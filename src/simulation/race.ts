@@ -448,6 +448,58 @@ export function blueFlagApproachingCarFor(
 }
 
 /**
+ * Anticipatory SIM courtesy for a compact lapped train. Formal blue flags keep
+ * their proximity threshold; cars immediately ahead prepare the same corridor
+ * before the leader reaches each one. Never bridges an open gap or a lead-lap
+ * rival, and never grants permission to pass under a controlled flag.
+ */
+export function blueFlagTrainApproachesFor(
+  cars: CarSnapshot[],
+  referenceLapTimeSeconds = 90,
+): Map<string, CarSnapshot> {
+  const lapTime = Math.max(40, referenceLapTimeSeconds)
+  const running = cars.filter((car) =>
+    car.status === 'running' && car.pitPhase === 'none' &&
+    car.offTrackSinceSeconds == null &&
+    (car.incidentTrackState ?? 'clear') === 'clear',
+  )
+  const approaches = new Map<string, CarSnapshot>()
+  for (const car of running) {
+    const approaching = blueFlagApproachingCarFor(car, running, lapTime)
+    if (approaching) approaches.set(car.driverId, approaching)
+  }
+  // Traverse forward from each directly flagged car. A physical train, unlike
+  // classification order, may straddle the timing line or contain different
+  // whole-lap deficits.
+  for (const tail of running) {
+    const leader = approaches.get(tail.driverId)
+    if (!leader) continue
+    let previous = tail
+    for (let index = 0; index < running.length; index += 1) {
+      let next: CarSnapshot | undefined
+      let gap = Infinity
+      for (const candidate of running) {
+        if (candidate.driverId === previous.driverId) continue
+        const physicalGap = ((candidate.totalDistance - previous.totalDistance) % 1 + 1) % 1
+        if (physicalGap > 1e-6 && physicalGap < gap) {
+          gap = physicalGap
+          next = candidate
+        }
+      }
+      if (!next || gap * lapTime > 0.8 || next.position <= leader.position) break
+      const lapLead = leader.totalDistance - next.totalDistance
+      const leaderGap = Math.ceil(lapLead - 1e-9) - lapLead
+      if (lapLead <= 0 || leaderGap <= 1e-6 || leaderGap * lapTime > 6) break
+      const existing = approaches.get(next.driverId)
+      if (existing && existing.driverId !== leader.driverId) break
+      approaches.set(next.driverId, leader)
+      previous = next
+    }
+  }
+  return approaches
+}
+
+/**
  * Re-forms the field for a red-flag restart: running cars line up nose to
  * tail behind the leader in classification order, with whole laps of deficit
  * preserved so lapped cars stay lapped. Pit/retired/finished cars are left
@@ -4969,6 +5021,12 @@ export function advanceRace(
   const physicalAheadById = new Map<string, CarSnapshot>()
   const physicalGapSecondsById = new Map<string, number>()
   const avoidingObstructionIds = new Set<string>()
+  const blueFlagTrainApproaches = isRaceDistance
+    ? blueFlagTrainApproachesFor(
+        frameCars,
+        referenceProfileLapTimeSeconds(config.track, categoryPhysics),
+      )
+    : new Map<string, CarSnapshot>()
 
   for (const car of frameCars) {
     if (car.status !== 'running') {
@@ -5081,6 +5139,9 @@ export function advanceRace(
     const defendIntensity = Number.isFinite(gapBehindSeconds)
       ? clamp01(1 - gapBehindSeconds / 1.6)
       : 0
+    const yieldingTo = !localControlPhase
+      ? blueFlagTrainApproaches.get(car.driverId)
+      : undefined
     const decisionContext: DriverDecisionContext = {
       seed: config.seed,
       driver,
@@ -5158,15 +5219,15 @@ export function advanceRace(
               intensity: clamp01(1 - gapAheadSeconds / 1.8),
             }
           : undefined,
-      // The blue flag from the previous tick. Without this the lapped car only
-      // lifts, holds the racing line, and the occupancy model then refuses the
-      // leader the road for as long as the two stay nose to tail.
+      // Use the actual lapping car, not the nearest following backmarker.
+      // Every member of a compact train prepares the same side in advance.
       yield:
-        car.blueFlag && behindCar?.status === 'running'
+        yieldingTo
           ? {
               active: true,
-              approachingId: behindCar.driverId,
-              approachingLateralOffsetM: nearestBehind!.lateralOffsetM,
+              approachingId: yieldingTo.driverId,
+              approachingLateralOffsetM: yieldingTo.lateralOffsetM,
+              preferredSide: hashChance(`blue-train-side:${yieldingTo.driverId}`) < 0.5 ? -1 : 1,
               requiredSeparationM: requiredLateralCentreSeparationM(
                 undefined,
                 undefined,

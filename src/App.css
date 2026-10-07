@@ -4033,3 +4033,15 @@
 .data-editor-title span { font-size: 10px; }
 .data-editor-title strong { font-size: 17px; }
 .data-editor-title > b { font-size: 27px; }
+.expansion-catalog { margin-top: 18px; padding: 14px; border: 1px solid #30343c; border-radius: 6px; color: #d6dbe3; font-size: 12px; }
+.expansion-catalog h3 { margin: 0 0 10px; font-size: 13px; }
+.expansion-catalog p { line-height: 1.6; }
+.expansion-catalog details { margin-top: 8px; padding: 9px; border: 1px solid #30343c; }
+.expansion-catalog summary { cursor: pointer; font-weight: 700; }
+.expansion-catalog table { width: 100%; border-collapse: collapse; margin-top: 12px; table-layout: fixed; }
+.expansion-catalog th, .expansion-catalog td { padding: 7px; border-bottom: 1px solid #30343c; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
+.expansion-catalog th:first-child, .expansion-catalog td:first-child { width: 42px; }
+.expansion-catalog caption { text-align: left; margin-bottom: 7px; color: #aeb8c6; }
+.expansion-catalog small { display: block; color: #aeb8c6; margin-top: 4px; }
+.expansion-catalog a { color: #86c8ff; text-decoration: underline; }
+.expansion-catalog summary:focus-visible, .expansion-catalog a:focus-visible { outline: 2px solid #86c8ff; outline-offset: 3px; }

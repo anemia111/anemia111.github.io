@@ -98,6 +98,8 @@ export type DriverEmergencyCue = {
  */
 export type DriverYieldCue = {
   active: boolean
+  /** Shared by a lapped train so adjacent cars clear the same corridor. */
+  preferredSide?: -1 | 1
   approachingId?: string
   /** Lateral offset of the car being let through. */
   approachingLateralOffsetM: number
@@ -663,7 +665,7 @@ function nominalLineFor(
       const negativeFits = approaching - required >= -usableHalfWidthM
       const positiveFits = approaching + required <= usableHalfWidthM
       const side = negativeFits && positiveFits
-        ? openSide(context, chosen.role, chosen.opponentId, approaching)
+        ? (context.yield?.preferredSide ?? openSide(context, chosen.role, chosen.opponentId, approaching))
         : negativeFits
           ? -1
           : positiveFits

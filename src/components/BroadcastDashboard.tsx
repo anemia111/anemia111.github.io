@@ -1,3 +1,4 @@
+import { ExpansionCatalog } from './ExpansionCatalog'
 import {
   Activity,
   Database,
@@ -649,6 +650,7 @@ function CenterView({
         ))}
       </div>
       {dataControl}
+      <ExpansionCatalog />
     </div>
   )
 }
