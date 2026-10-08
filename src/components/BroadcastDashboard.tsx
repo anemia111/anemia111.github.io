@@ -860,7 +860,7 @@ export function BroadcastDashboard({
           <span>{sessionProgressLabel}</span>
           <time>
             {formatClock(
-              isRaceStage
+              isRaceStage && !(categoryPresentation && sessionPhaseLabel === 'FORMATION')
                 ? snapshot.raceClockSeconds
                 : snapshot.elapsedSeconds,
             )}

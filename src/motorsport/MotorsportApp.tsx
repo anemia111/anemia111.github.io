@@ -189,7 +189,7 @@ export function MotorsportApp({ onBack, initialChampionship = 'kyojo', initialFr
       onSkipFormationLap={() => { if(worker.current) worker.current.postMessage({type:'skip-formation',generation:generation.current} satisfies MotorsportWorkerCommand); else setState(current=>current.phase === 'formation' ? {...current,phase:'racing'} : current) }} onSpeedChange={setSpeed} onStageChange={changeStage}
       raceControlLog={[...state.events].reverse().slice(0,50).map((event,index) => ({id:`${event.tick}:${index}`,message:event.message,source:'SIM',timeLabel:clock(event.seconds)}))}
       raceLabel="Race" selectedCar={selectedCar} sessionPhaseLabel={state.phase === 'formation' ? 'FORMATION' : state.phase === 'finished' ? 'FINISHED' : state.flag.toUpperCase()}
-      sessionProgressLabel={config.format.kind === 'laps' ? `LAP ${Math.min(snapshot.leaderLap,config.format.laps)} / ${config.format.laps}` : `${clock(state.raceSeconds)} / ${clock(config.format.seconds)}`}
+      sessionProgressLabel={state.phase === 'formation' ? `${clock(state.formationSeconds)} / ${clock(config.course.lengthM / (80 / 3.6))}` : config.format.kind === 'laps' ? `LAP ${Math.min(snapshot.leaderLap,config.format.laps)} / ${config.format.laps}` : `${clock(state.raceSeconds)} / ${clock(config.format.seconds)}`}
       snapshot={snapshot} speed={speed as SpeedMultiplier} stage={stage} seriesId="f1-custom" seriesLabel={label}
       seriesOptions={seriesPackages.map(item => ({id:item.id,label:item.label}))}
       tireLabels={{S:'Not available',M:'Not available',H:'Not available',I:'Not available',W:'Not available'}} timingRows={timingRows} track={track}

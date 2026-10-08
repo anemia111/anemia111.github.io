@@ -21,7 +21,17 @@ try {
     await page.getByTestId('motorsport-app').waitFor()
     for (const [championship, expected] of [['kyojo', 18], ['super-gt', 43], ['wec', 35], ['indycar', 25]]) {
       await page.getByRole('combobox', { name: 'Racing series', exact: true }).selectOption(`motorsport:${championship}`)
+      // Exercise the default 1x start before changing distance or using accelerated playback.
+      await page.getByRole('button',{name:'1x',exact:true}).click()
+      await page.getByRole('button',{name:'Resume simulation',exact:true}).click()
+      await page.waitForFunction(()=>document.querySelector('.broadcast-session-core time')?.textContent !== '00:00:00',null,{timeout:15000})
+      assert.equal(await page.locator('.broadcast-phase-label').textContent(),'FORMATION')
+      await page.getByRole('button',{name:'Skip formation lap',exact:true}).click()
+      await page.waitForFunction(()=>document.querySelector('.broadcast-phase-label')?.textContent==='GREEN' && document.querySelector('.broadcast-session-core time')?.textContent !== '00:00:00',null,{timeout:15000})
+      await page.getByRole('button',{name:'Pause simulation',exact:true}).click()
       await page.getByRole('button', { name: 'Open setup', exact: true }).click()
+      const setupBounds = await page.getByRole('dialog',{name:'race setup',exact:true}).boundingBox()
+      assert.ok(setupBounds && Math.abs(setupBounds.y+setupBounds.height-(viewport.height-52))<2,`${championship}: settings bottom placement`)
       assert.equal(await page.getByRole('button', {name:'FREE',exact:true}).isEnabled(), true)
       const rows = page.locator('.leaderboard-rows > li')
       await rows.first().waitFor()

@@ -4069,3 +4069,10 @@
 
 .broadcast-class-leaderboards { display: flex; flex-direction: column; gap: 6px; min-height: 0; overflow: hidden; }
 .broadcast-class-leaderboards > .broadcast-leaderboard { flex: 1; min-height: 0; }
+
+/* Keep race settings above the bottom control bar in every category. */
+.race-shell > .setup-panel[aria-label="race setup"] {
+  top: auto;
+  bottom: 52px;
+  max-height: min(60svh, calc(100svh - 112px));
+}
