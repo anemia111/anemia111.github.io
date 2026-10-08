@@ -211,7 +211,6 @@ export function MotorsportApp({ onBack, initialChampionship = 'kyojo', initialFr
       {panel === 'setup' && <>    <header className="setup-event-fields">
 
 
-      <label className="field-block"><span>Category</span><select aria-label="Motorsport championship" value={config.championship} onChange={event => changeEvent(event.target.value as ChampionshipId)}>{motorsportChampionships.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
       <label className="field-block"><span>Championship round</span><select aria-label="Motorsport event" value={config.eventId} onChange={event => changeEvent(config.championship, event.target.value)}>{events.map(event => <option key={event.id} value={event.id} disabled={!courses.some(course => course.id === event.courseId)}>{event.label} · {event.dateLabel}{courses.some(course => course.id === event.courseId) ? '' : ' · 形状確認中'}</option>)}</select></label>
     </header>
     <section className="setup-section" aria-label="Race controls">
