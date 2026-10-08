@@ -1,3 +1,4 @@
+import { FreeModeHeader, FreeModeSearch } from './SessionChrome'
 import {
   ArrowDown,
   ArrowUp,
@@ -11,7 +12,6 @@ import {
   Shuffle,
   Trash2,
   Upload,
-  X,
 } from 'lucide-react'
 import {
   useEffect,
@@ -705,26 +705,7 @@ export function FreeModeBuilder({
       role="dialog"
     >
       <section className="free-mode-builder">
-        <header className="free-mode-header">
-          <div>
-            <span>INDEPENDENT SIM SESSION</span>
-            <h1>Free Mode Builder</h1>
-            <p>
-              Championship points, calendar progress and OpenF1 sessions stay
-              untouched.
-            </p>
-          </div>
-          <button
-            aria-label="Close Free Mode Builder"
-            className="free-mode-icon-button"
-            onClick={onClose}
-            ref={closeButtonRef}
-            title="Close"
-            type="button"
-          >
-            <X size={19} />
-          </button>
-        </header>
+        <FreeModeHeader onClose={onClose} closeRef={closeButtonRef}/>
 
         <div className="free-mode-settings">
           <label>
@@ -996,30 +977,7 @@ export function FreeModeBuilder({
           </button>
         </div>
 
-        <div className="free-mode-search">
-          <label>
-            <span>Find driver</span>
-            <input
-              onChange={(event) => setDriverSearch(event.target.value)}
-              placeholder="Name, code, nationality, rating, history"
-              value={driverSearch}
-            />
-          </label>
-          <label>
-            <span>Find vehicle</span>
-            <input
-              onChange={(event) => setVehicleSearch(event.target.value)}
-              placeholder="Team name or car number"
-              value={vehicleSearch}
-            />
-          </label>
-          <div className="free-mode-field-summary">
-            <strong>{configuration.entrants.length}</strong>
-            <span>cars</span>
-            <strong>{fieldMean.toFixed(1)}</strong>
-            <span>{configuration.equalCars ? 'equal rating' : 'field mean'}</span>
-          </div>
-        </div>
+        <FreeModeSearch driverSearch={driverSearch} vehicleSearch={vehicleSearch} onDriverSearch={setDriverSearch} onVehicleSearch={setVehicleSearch} cars={configuration.entrants.length} mean={fieldMean.toFixed(1)} equalCars={configuration.equalCars}/>
 
         <div className="free-mode-entry-table" role="region" aria-label="Entries">
           <div className="free-mode-entry-head">

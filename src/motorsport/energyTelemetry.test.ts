@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createMotorsportConfig } from './packages'
 import { advanceMotorsportRace, createMotorsportRace } from './race'
-import { targetSpeedMps } from './coursePhysics'
+import { targetSpeedMps, stationAt } from './coursePhysics'
 import { parseMotorsportSave, serializeMotorsportSave } from './persistence'
 
 describe('category energy and telemetry',()=>{
@@ -11,7 +11,7 @@ describe('category energy and telemetry',()=>{
       const entry=config.entries.find(entry=>entry.machine.hybridPowerKw.value>0)!
       config.entries=[entry]
       const distances=Array.from({length:512},(_,index)=>index/512*config.course.lengthM)
-      const straight=distances.sort((a,b)=>targetSpeedMps(config.course,entry.machine,b)-targetSpeedMps(config.course,entry.machine,a))[0]
+      const straight=distances.filter(distance=>stationAt(config.course,distance).radiusM>10000).sort((a,b)=>targetSpeedMps(config.course,entry.machine,b)-targetSpeedMps(config.course,entry.machine,a))[0]
       const state={...createMotorsportRace(config),phase:'racing' as const}
       state.cars[0]={...state.cars[0],distanceM:straight,speedMps:55,hybridEnergyMj:entry.machine.hybridCapacityMj.value*0.5}
       const running=advanceMotorsportRace(state,1,config)

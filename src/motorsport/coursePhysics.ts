@@ -4,7 +4,7 @@ export const MOTORSPORT_STEP_SECONDS = 0.1
 const SAMPLE_COUNT = 512
 export type CourseStation = { x: number; y: number; nx: number; ny: number; radiusM: number; bankingRadians: number }
 const stationCache = new WeakMap<MotorsportCourse, CourseStation[]>()
-const envelopeCache = new WeakMap<MotorsportCourse, WeakMap<MotorsportMachine, number[]>>()
+const envelopeCache = new WeakMap<MotorsportCourse, WeakMap<MotorsportMachine, Map<string, number[]>>>()
 export const modulo = (value: number, divisor: number) => ((value % divisor) + divisor) % divisor
 export const clamp = (value: number, low: number, high: number) => Math.min(high, Math.max(low, value))
 
@@ -45,17 +45,42 @@ export function courseStations(course: MotorsportCourse): CourseStation[] {
 }
 
 /** Point-mass tyre/aero force balance, with banking and a backward braking pass. */
-export function speedEnvelope(course: MotorsportCourse, machine: MotorsportMachine): number[] {
+export type DrivingConditions = { massKg: number; gripScale: number; liftScale?: number; dragScale?: number }
+
+/** Shared grip budget: braking/traction and cornering cannot each use 100%. */
+export function tyreForceBudget(machine: MotorsportMachine, station: CourseStation, speed: number, conditions: DrivingConditions) {
+  const { massKg: mass, gripScale, liftScale = 1 } = conditions
+  const gravity = 9.80665
+  const load = mass * gravity * Math.cos(station.bankingRadians) + 0.5 * 1.225 * machine.liftAreaM2.value * liftScale * speed ** 2
+  const available = machine.tyreMu.value * gripScale * load
+  const lateral = Math.max(0, mass * speed ** 2 / station.radiusM - mass * gravity * Math.sin(station.bankingRadians))
+  return { available, lateral, longitudinal: Math.sqrt(Math.max(0, available ** 2 - lateral ** 2)) }
+}
+
+export function stationAt(course: MotorsportCourse, distanceM: number) {
+  return courseStations(course)[Math.floor(modulo(distanceM, course.lengthM) / course.lengthM * SAMPLE_COUNT)]
+}
+
+export function speedEnvelope(course: MotorsportCourse, machine: MotorsportMachine, conditions?: DrivingConditions): number[] {
   let byMachine = envelopeCache.get(course)
   if (!byMachine) { byMachine = new WeakMap(); envelopeCache.set(course, byMachine) }
-  const cached = byMachine.get(machine)
+  let variants = byMachine.get(machine)
+  if (!variants) { variants = new Map(); byMachine.set(machine, variants) }
+  // Conservative finite bins bound cache size and avoid a 512-station solve
+  // for every 100ms tick. Forces themselves use the unquantized current state.
+  const mass = conditions ? Math.ceil(conditions.massKg / 10) * 10 : machine.massKg.value + machine.driverMassKg.value + machine.fuelCapacityKg.value * 0.5
+  const grip = conditions ? Math.max(0.2, Math.floor(conditions.gripScale * 20 + 1e-8) / 20) : 1
+  const liftScale = Math.floor((conditions?.liftScale ?? 1) * 10 + 1e-8) / 10
+  const dragScale = Math.ceil((conditions?.dragScale ?? 1) * 20 - 1e-8) / 20
+  const key = `${mass}:${grip}:${liftScale}:${dragScale}`
+  const cached = variants.get(key)
   if (cached) return cached
-  const mass = machine.massKg.value + machine.driverMassKg.value + machine.fuelCapacityKg.value * 0.5
-  const mu = machine.tyreMu.value
-  const terminal = Math.cbrt(machine.powerKw.value * 1000 * 0.94 / (0.5 * 1.225 * machine.dragAreaM2.value))
+  const mu = machine.tyreMu.value * grip
+  const maximumPower = machine.powerKw.value + (machine.classId === 'indycar' ? machine.hybridPowerKw.value + (course.kind === 'road' || course.kind === 'street' ? 44.74 : 0) : 0)
+  const terminal = Math.cbrt(maximumPower * 1000 * 0.94 / (0.5 * 1.225 * machine.dragAreaM2.value * dragScale))
   const speeds = courseStations(course).map(({ radiusM, bankingRadians: angle }) => {
     const bankGrip = (mu * Math.cos(angle) + Math.sin(angle)) / Math.max(0.1, Math.cos(angle) - mu * Math.sin(angle))
-    const denominator = 1 - bankGrip * radiusM * 0.5 * 1.225 * machine.liftAreaM2.value / mass
+    const denominator = 1 - bankGrip * radiusM * 0.5 * 1.225 * machine.liftAreaM2.value * liftScale / mass
     const corner = denominator <= 0 ? terminal : Math.sqrt(bankGrip * 9.80665 * radiusM / denominator)
     return Math.max(8, Math.min(terminal, corner))
   })
@@ -63,11 +88,15 @@ export function speedEnvelope(course: MotorsportCourse, machine: MotorsportMachi
   // Two closed-loop passes carry the braking constraint across the start line.
   for (let index = SAMPLE_COUNT * 2 - 1; index >= 0; index--) {
     const current = index % SAMPLE_COUNT, next = (current + 1) % SAMPLE_COUNT
-    const aeroLoad = 0.5 * 1.225 * machine.liftAreaM2.value * speeds[current] ** 2
-    const deceleration = Math.min(35, mu * 9.80665 * (1 + aeroLoad / (mass * 9.80665)))
+    // Reserve 5% lateral headroom for a drivable line. The same combined
+    // force law is used here and during integration, including bank support.
+    speeds[current] *= index >= SAMPLE_COUNT ? 0.975 : 1
+    const forces = tyreForceBudget(machine, courseStations(course)[current], speeds[current], { massKg: mass, gripScale: grip, liftScale })
+    const deceleration = Math.max(0.5, Math.min(35, forces.longitudinal / mass))
     speeds[current] = Math.min(speeds[current], Math.sqrt(speeds[next] ** 2 + 2 * deceleration * ds))
   }
-  byMachine.set(machine, speeds)
+  if (variants.size >= 64) variants.delete(variants.keys().next().value!)
+  variants.set(key, speeds)
   return speeds
 }
 export function coursePosition(course: MotorsportCourse, distanceM: number, lateralM = 0): [number, number] {
@@ -77,8 +106,8 @@ export function coursePosition(course: MotorsportCourse, distanceM: number, late
   const a = stations[index], b = stations[(index + 1) % SAMPLE_COUNT]
   return [a.x + (b.x - a.x) * fraction + a.nx * lateralM, a.y + (b.y - a.y) * fraction + a.ny * lateralM]
 }
-export function targetSpeedMps(course: MotorsportCourse, machine: MotorsportMachine, distanceM: number): number {
-  const envelope = speedEnvelope(course, machine)
+export function targetSpeedMps(course: MotorsportCourse, machine: MotorsportMachine, distanceM: number, conditions?: DrivingConditions): number {
+  const envelope = speedEnvelope(course, machine, conditions)
   const exact = modulo(distanceM, course.lengthM) / course.lengthM * SAMPLE_COUNT
   const index = Math.floor(exact), fraction = exact - index
   return envelope[index] + (envelope[(index + 1) % SAMPLE_COUNT] - envelope[index]) * fraction

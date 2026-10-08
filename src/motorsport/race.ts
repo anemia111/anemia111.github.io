@@ -1,5 +1,6 @@
 import { recordTelemetry } from '../simulation/telemetryHistory'
-import { clamp, modulo, MOTORSPORT_STEP_SECONDS, targetSpeedMps } from './coursePhysics'
+import { clamp, modulo, MOTORSPORT_STEP_SECONDS, targetSpeedMps, stationAt, tyreForceBudget } from './coursePhysics'
+import { drivetrainState, trafficAero, tyreGripScale } from './vehicleDynamics'
 import type { MotorsportCar, MotorsportEntry, MotorsportPitRequest, MotorsportRaceConfig, MotorsportRaceState } from './types'
 
 const RUNNING = new Set(['running', 'pit-entry', 'pit-service', 'pit-exit'])
@@ -231,7 +232,12 @@ function advanceTick(previous: MotorsportRaceState, config: MotorsportRaceConfig
     car.hybridPowerKw = 0; car.regenerationPowerKw = 0
     if (car.status !== 'running') car.lapInvalid = true
     if (car.status !== 'running') {
-      car.speedMps = car.status === 'pit-service' ? 0 : config.course.pitSpeedKph.value / 3.6
+      const pitLimit = config.course.pitSpeedKph.value / 3.6
+      car.speedMps = car.status === 'pit-service' ? 0 : car.speedMps + clamp(pitLimit - car.speedMps, -6 * dt, 3 * dt)
+      car.throttlePercent = car.status === 'pit-service' ? 0 : car.speedMps < pitLimit ? 35 : 10
+      car.brakePercent = car.speedMps > pitLimit ? 50 : 0
+      const pitDrivetrain = drivetrainState(machine, car.speedMps, car.gear)
+      car.gear = pitDrivetrain.gear; car.rpm = pitDrivetrain.rpm
       if (car.status === 'pit-service') {
         const work = car.stopWork!
         const elapsed = work.totalSeconds - car.pitServiceRemaining
@@ -283,14 +289,21 @@ function advanceTick(previous: MotorsportRaceState, config: MotorsportRaceConfig
       car.activeDrivingEnd = state.raceSeconds
       const paceSkill = config.sessionKind === 'qualifying' ? driver.qualifyingPace ?? driver.racePace ?? 0.75 : driver.racePace ?? 0.75
       const tyreSkill = driver.tyreManagement ?? 0.75
-      const compoundGrip = car.tyreSets.at(-1)?.compound === 'alternate' ? 1.03 : 1
-      const surfaceGrip = (config.weather === 'wet' ? 0.73 : 1) * compoundGrip
+      const surfaceGrip = tyreGripScale(car, config.weather)
+      const mass = machine.massKg.value + machine.driverMassKg.value + car.fuelKg
+      const ahead = nearestAhead.get(car.entryId)
+      const aero = ahead ? trafficAero(ahead.gap, car.lateralM - ahead.car.lateralM, car.speedMps) : { dragScale: 1, liftScale: 1 }
+      const conditions = { massKg: mass, gripScale: surfaceGrip, ...aero }
       const paceFactor = car.paceMode === 'push' ? 1.015 : car.paceMode === 'save' ? 0.96 : car.paceMode === 'defend' ? 0.99 : 1
-      let target = targetSpeedMps(config.course, machine, car.distanceM) * Math.min(1,(0.95 + paceSkill * 0.05) * paceFactor) * Math.sqrt(surfaceGrip) * (0.9 + car.tyreLife * 0.1)
+      let target = targetSpeedMps(config.course, machine, car.distanceM, conditions) * Math.min(1,(0.95 + paceSkill * 0.05) * paceFactor)
+      if (car.pitRequest) {
+        const pitDistance = modulo(config.course.pitEntry.value * length - car.distanceM, length)
+        const availableBraking = tyreForceBudget(machine, stationAt(config.course, car.distanceM), car.speedMps, conditions).longitudinal / mass
+        target = Math.min(target, Math.sqrt((config.course.pitSpeedKph.value / 3.6) ** 2 + 2 * availableBraking * pitDistance * 0.8))
+      }
       if (state.flag === 'fcy') target = Math.min(target, 80 / 3.6)
       if (state.flag === 'yellow') target *= 0.7
       if (state.flag === 'sc') target = Math.min(target, 100 / 3.6)
-      const ahead = nearestAhead.get(car.entryId)
       car.blueFlag = yields.has(car.entryId)
       const overtaking = ahead && state.flag === 'green' && (car.speedMps > ahead.car.speedMps + 0.5 || car.distanceM - ahead.car.distanceM >= length * 0.8)
       const desiredLateral = car.blueFlag ? config.course.widthM.value / 2 - 1.5 : overtaking ? -2.2 : 0
@@ -298,21 +311,30 @@ function advanceTick(previous: MotorsportRaceState, config: MotorsportRaceConfig
       if (ahead && (state.flag !== 'green' || Math.abs(car.lateralM - ahead.car.lateralM) < 2.1)) {
         if (ahead.gap < Math.max(7, car.speedMps * 0.5)) target = Math.min(target, Math.max(0, ahead.car.speedMps + (ahead.gap - 7) * 0.5))
       }
-      const mass = machine.massKg.value + machine.driverMassKg.value + car.fuelKg
-      const drag = 0.5 * 1.225 * machine.dragAreaM2.value * car.speedMps ** 2
+      const drag = 0.5 * 1.225 * machine.dragAreaM2.value * aero.dragScale * car.speedMps ** 2
       let powerKw = machine.powerKw.value
-      const hybrid = state.flag === 'green' && car.speedMps*3.6 >= (machine.hybridMinimumSpeedKph?.value ?? 0) && car.speedMps > 5 && target > car.speedMps && car.hybridEnergyMj > 0
+      let hybrid = state.flag === 'green' && car.speedMps*3.6 >= (machine.hybridMinimumSpeedKph?.value ?? 0) && car.speedMps > 5 && target > car.speedMps && car.hybridEnergyMj > 0
         ? Math.min(machine.hybridPowerKw.value, car.hybridEnergyMj * 1000 / dt) : 0
       // Hypercar's electrical contribution remains inside the combined cap.
       if (entry.classId === 'indycar') powerKw += hybrid
+      const p2p = overtaking && state.flag === 'green' && target > car.speedMps && car.pushToPassSeconds > 0 && entry.classId === 'indycar' && (config.course.kind === 'road' || config.course.kind === 'street')
+        ? 44.74 * Math.min(1, car.pushToPassSeconds / dt) : 0
+      powerKw += p2p
+      const station = stationAt(config.course, car.distanceM)
+      const tyreForces = tyreForceBudget(machine, station, car.speedMps, conditions)
+      const rolling = 0.015 * mass * 9.80665
+      const wheelPowerForce = powerKw * 1000 * 0.94 / Math.max(8, car.speedMps)
+      const desiredForce = mass * (target - car.speedMps) / dt + drag + rolling
+      // Driven-axle shares are SIM; LMH front assist uses its deployment gate.
+      const drivenShare = entry.classId === 'hypercar' && hybrid > 50 ? 1 : 0.62
+      const driveForce = Math.max(0, Math.min(desiredForce, wheelPowerForce, tyreForces.longitudinal * drivenShare))
+      const braking = tyreForces.longitudinal / mass
+      const brakeForce = Math.min(tyreForces.longitudinal, Math.max(0, -desiredForce))
+      const acceleration = (driveForce - drag - rolling - brakeForce) / mass
+      const throttleFraction = clamp(driveForce / Math.max(1, wheelPowerForce), 0, 1)
+      hybrid *= throttleFraction
       car.hybridPowerKw = hybrid
-      if (overtaking && car.pushToPassSeconds > 0 && entry.classId === 'indycar') {
-        powerKw += 45; car.pushToPassSeconds = Math.max(0, car.pushToPassSeconds - dt)
-      }
-      const force = Math.min(machine.tyreMu.value * mass * 9.80665 * surfaceGrip,
-        powerKw * 1000 * 0.94 / Math.max(8, car.speedMps)) - drag - 0.015 * mass * 9.80665
-      const braking = machine.tyreMu.value * 9.80665 * surfaceGrip * (1 + 0.5 * 1.225 * machine.liftAreaM2.value * car.speedMps ** 2 / (mass * 9.80665))
-      const acceleration = target < car.speedMps ? Math.max(-braking, (target - car.speedMps) / dt) : force / mass
+      if (p2p > 0 && throttleFraction > 0.05) car.pushToPassSeconds = Math.max(0, car.pushToPassSeconds - dt)
       const nextSpeed = Math.max(0, car.speedMps + acceleration * dt)
       const unconstrainedStep = (car.speedMps + nextSpeed) * 0.5 * dt
       // Neutralisation applies regardless of lateral lane. Integrate up to the
@@ -320,8 +342,8 @@ function advanceTick(previous: MotorsportRaceState, config: MotorsportRaceConfig
       const distanceStep = ahead && state.flag !== 'green'
         ? Math.min(unconstrainedStep, Math.max(0, ahead.gap + ahead.car.speedMps * dt - 6))
         : unconstrainedStep
-      car.throttlePercent = acceleration < -0.1 ? 0 : clamp((mass*Math.max(0,acceleration)+drag+0.015*mass*9.80665)*Math.max(8,car.speedMps)/(powerKw*1000*0.94)*100,0,100)
-      car.brakePercent = acceleration < -0.1 ? clamp(-acceleration/Math.max(0.1,braking)*100,0,100) : 0
+      car.throttlePercent = throttleFraction * 100
+      car.brakePercent = braking > 0 ? clamp(brakeForce / (mass * braking) * 100, 0, 100) : 0
       car.speedMps = nextSpeed; car.distanceM += distanceStep
       car.driverDistanceM[car.driverIndex] += distanceStep
       const fuelUsed = machine.fuelKgPerKm.value * distanceStep / 1000 * (acceleration < -1 ? 0.35 : 0.85 + 0.15 * Math.min(1, Math.max(0, acceleration) / 4)) * (entry.classId === 'hypercar' ? Math.max(0,(powerKw-hybrid)/powerKw) : 1) * (car.paceMode === 'save' ? 0.85 : car.paceMode === 'push' ? 1.05 : 1)
@@ -335,16 +357,18 @@ function advanceTick(previous: MotorsportRaceState, config: MotorsportRaceConfig
           appendEvent(state, car.entryId, 'Virtual-energy allowance exceeded. Steward review required; fuel remains a separate physical quantity.')
         }
       }
-      const regenerationMj = acceleration < -1 ? Math.min(machine.hybridRecoveryPowerKw?.value ?? machine.hybridPowerKw.value, -acceleration * mass * car.speedMps / 1000 * 0.3) * dt / 1000 : 0
+      const regenerationMj = brakeForce > 0 ? Math.min(machine.hybridRecoveryPowerKw?.value ?? machine.hybridPowerKw.value, brakeForce * car.speedMps / 1000 * 0.3) * dt / 1000 : 0
       const acceptedRegeneration = machine.hybridCapacityMj.value > 0 ? Math.min(regenerationMj,Math.max(0,machine.hybridCapacityMj.value-car.hybridEnergyMj+hybrid*dt/1000)) : 0
       car.regenerationPowerKw = acceptedRegeneration*1000/dt
       car.hybridRecoveredMj = (car.hybridRecoveredMj ?? 0) + acceptedRegeneration
       car.hybridEnergyMj = clamp(car.hybridEnergyMj + acceptedRegeneration - hybrid * dt / 1000, 0, machine.hybridCapacityMj.value)
       car.hybridDeployedMj += hybrid * dt / 1000
       car.tyreLife = Math.max(0, car.tyreLife - distanceStep / 1000 / (80 + tyreSkill * 180) * (config.weather === 'wet' ? 0.7 : car.tyreSets.at(-1)?.compound === 'alternate' ? 1.4 : 1) * (car.paceMode === 'push' ? 1.2 : car.paceMode === 'save' ? 0.8 : 1))
-      car.tyreTemperatureC += (car.speedMps > 15 ? 90 - car.tyreTemperatureC : 35 - car.tyreTemperatureC) * dt / 40
-      car.gear = clamp(Math.ceil(car.speedMps / Math.max(1, targetSpeedMps(config.course, machine, car.distanceM)) * machine.gears.value), 1, machine.gears.value)
-      car.rpm = car.speedMps < 0.1 ? 0 : Math.round(3000+car.speedMps*3.6/Math.max(1,car.gear)*180)
+      const tyreLoad = clamp((tyreForces.lateral + driveForce + brakeForce) / Math.max(1, tyreForces.available), 0, 1.5)
+      const temperatureTarget = car.speedMps < 5 ? 35 : (config.weather === 'wet' ? 55 : 72) + tyreLoad * 28
+      car.tyreTemperatureC += (temperatureTarget - car.tyreTemperatureC) * dt / 40
+      const drivetrain = drivetrainState(machine, car.speedMps, car.gear)
+      car.gear = drivetrain.gear; car.rpm = drivetrain.rpm
       if (car.status === 'running') car.telemetryHistory = recordTelemetry(car.telemetryHistory,{lap:Math.floor(car.distanceM/length),progress:modulo(car.distanceM,length)/length,seconds:state.raceSeconds,speedKph:car.speedMps*3.6,throttlePercent:car.throttlePercent ?? 0,brakePercent:car.brakePercent ?? 0,gear:car.gear,rpm:car.rpm})
       if (car.pitRequest) {
         const entryLine = (Math.floor(beforeDistance / length) + config.course.pitEntry.value) * length

@@ -4091,3 +4091,23 @@
     minmax(38px, 0.85fr) minmax(38px, 0.85fr)
     25px 25px 25px 18px minmax(30px, 0.42fr) 24px 26px;
 }
+
+/* Shared session chrome: native and expansion categories use identical sizing. */
+.setup-panel { font-size: 13px; }
+.setup-event-fields .field-block { gap: 6px; }
+.setup-panel .preset-row { gap: 6px; flex-wrap: wrap; }
+.setup-panel .preset-row button { min-height: 28px; padding: 0 8px; }
+.setup-panel .motorsport-import { font-size: 12px; min-width: 0; }
+.setup-panel .motorsport-import input { max-width: 100%; }
+.setup-panel .motorsport-phase { display: block; margin-top: 10px; font-size: 12px; }
+.free-mode-settings label > small { font-size: 10px; line-height: 1.35; color: #91a3b4; }
+.free-mode-settings { align-items: start; }
+.free-mode-inline-input { align-items: stretch; }
+.free-mode-inline-input button { height: 30px; }
+.free-mode-driver-cell { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 5px; min-width: 0; }
+.free-mode-crew summary { cursor: pointer; font-size: 9px; color: #91a3b4; padding: 6px 3px; }
+.free-mode-crew > div { position: fixed; z-index: 120; left: max(24px, calc((100vw - 1500px) / 2 + 70px)); bottom: 130px; width: min(420px, 50vw); padding: 12px; border: 1px solid #294156; border-radius: 4px; background: #0a1824; box-shadow: 0 8px 24px #000a; }
+.free-mode-crew > div label { display: grid; gap: 4px; margin-bottom: 8px; font-size: 10px; }
+.free-mode-crew > div select { width: 100%; }
+.free-mode-crew > div button { margin-right: 5px; }
+.free-mode-presets > input[hidden] { display: none; }
