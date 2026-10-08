@@ -52,6 +52,36 @@ length, identical distances to sector marks and no source mutation.
 
 ## Verification and limits
 
+## Expansion sector timing and pit joining follow-up
+
+The shared dashboard previously received empty current-sector arrays, null
+sector times and permanently dim mini sectors from the expansion adapter.
+The expansion engine now records interpolated crossings of the actual timing
+marks, including eight mini intervals per sector and Suzuka's four sectors.
+Unknown timing layouts remain unavailable. Sector bests compare within the
+car's class, so GT300/LMGT3 can set purple times independently. Pit and
+neutralised laps remain visible but cannot replace valid personal bests.
+Timing state is saved and validated; older saves start their clock at the next
+control line rather than inventing a full lap from an incomplete interval.
+
+A separate reproduced bug allowed a pit-exit car to join directly onto an
+occupied racing line. Exit now checks nearby traffic including fast cars
+approaching across the lap boundary, slows before the merge, waits when the
+gap is occupied, and releases when clear. Pit movement stops exactly at the
+service or exit boundary instead of overshooting it. Existing pit-lane queue
+order remains in effect. Race best-lap selection now honours the existing
+pit/neutralisation invalidation latch even after the car has rejoined.
+
+Dedicated regression covers all four expansion categories' sector clocks,
+class bests, four-sector courses, checkpoint round trips and invalid timing.
+Pit joining is reproduced in GT, WEC and INDYCAR, with a lap-boundary approach
+and invalid pit-lap best-time regression. `sector-timing-playtest.mjs` checks
+that live displayed sector times change and mini-sector colours update in
+each expansion category. The final acceptance run additionally includes all
+six published-distance full fields, including 62-car Le Mans over 24 hours.
+
+## Earlier verification and calibration limits
+
 Related regression: 16 files / 167 tests, including GT/WEC traffic on all
 their available real courses, a matched-speed three-car slower-class train,
 equal-performance cars and caution no-passing. Build and lint pass. Normal

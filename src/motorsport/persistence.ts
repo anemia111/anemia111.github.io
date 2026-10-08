@@ -2,6 +2,7 @@ import { encodeTelemetryHistory, decodeTelemetryHistory } from '../simulation/te
 import { motorsportMachine } from './packages'
 import { validateMotorsportConfig } from './race'
 import type { MotorsportRaceConfig, MotorsportRaceState } from './types'
+import { validSectorTiming } from './sectorTiming'
 
 export const MOTORSPORT_SAVE_KEY = 'race-sim-motorsport-2026-v1'
 export type MotorsportSave = { schemaVersion: 1; config: MotorsportRaceConfig; state: MotorsportRaceState }
@@ -45,6 +46,7 @@ export function parseMotorsportSave(raw: string): MotorsportSave | null {
     if (!Array.isArray(save.state.events) || save.state.events.length > 500 || save.state.events.some(event => !Number.isSafeInteger(event.tick) || !Number.isFinite(event.seconds) || typeof event.message !== 'string' || (event.entryId !== null && !save.config.entries.some(entry => entry.id === event.entryId)))) return null
     if (save.state.cars.length !== save.config.entries.length || new Set(save.state.cars.map(car => car.entryId)).size !== save.state.cars.length) return null
     for (const car of save.state.cars) {
+      if (car.timing !== undefined && !validSectorTiming(car.timing, save.config.course)) return null
       if (car.telemetryHistory !== undefined) {
         if (!Array.isArray(car.telemetryHistory) || car.telemetryHistory.length>768) return null
         car.telemetryHistory = car.telemetryHistory.map(point=>Array.isArray(point)?{lap:point[0],progress:point[1],seconds:point[2],speedKph:point[3],throttlePercent:point[4],brakePercent:point[5],gear:point[6],rpm:point[7]}:point)

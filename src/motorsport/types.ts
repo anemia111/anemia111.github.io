@@ -75,9 +75,15 @@ export type MotorsportCar = {
   laps: number; lastLapSeconds: number | null; bestLapSeconds: number | null; lapStartedAt: number
   lapHistory?: { lap: number; seconds: number; driverIndex: number; compound: string; pit: boolean }[]
   lapInvalid?: boolean
+  timing?: MotorsportSectorTiming
   paceMode?: 'push' | 'standard' | 'save' | 'defend'
   finishTime: number | null; penaltySeconds: number; warnings: string[]
   blueFlag: boolean; pushToPassSeconds: number; hybridDeployedMj: number
+}
+export type MotorsportSectorTiming = {
+  lap: number; startedAt: number | null; crossings: (number | null)[]; invalid: boolean
+  lastLap: { lap: number; sectors: number[]; miniSectors: number[]; valid: boolean } | null
+  bestSectors: (number | null)[]; bestMiniSectors: (number | null)[]
 }
 export type MotorsportRaceState = {
   schemaVersion: 1; tick: number; raceSeconds: number; formationSeconds: number

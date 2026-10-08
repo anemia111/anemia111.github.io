@@ -2,6 +2,7 @@ import { advancePedals } from '../simulation/pedalControl'
 import { recordTelemetry } from '../simulation/telemetryHistory'
 import { clamp, modulo, MOTORSPORT_STEP_SECONDS, targetSpeedMps, stationAt, tyreForceBudget } from './coursePhysics'
 import { drivetrainState, trafficAero, tyreGripScale } from './vehicleDynamics'
+import { initialSectorTiming, advanceSectorTiming } from './sectorTiming'
 import type { MotorsportCar, MotorsportEntry, MotorsportPitRequest, MotorsportRaceConfig, MotorsportRaceState } from './types'
 
 const RUNNING = new Set(['running', 'pit-entry', 'pit-service', 'pit-exit'])
@@ -56,6 +57,7 @@ export function createMotorsportRace(config: MotorsportRaceConfig): MotorsportRa
     finishTime: null, penaltySeconds: 0, warnings: [], blueFlag: false,
     pushToPassSeconds: config.championship === 'indycar' && (config.course.kind === 'road' || config.course.kind === 'street') ? 200 : 0,
     hybridDeployedMj: 0,
+    timing: initialSectorTiming(config.course, !config.sessionKind || config.sessionKind === 'race'),
   }))
   const timed = config.sessionKind === 'practice' || config.sessionKind === 'qualifying'
   if (timed) cars.forEach((car, index) => {
@@ -214,7 +216,7 @@ function advanceTick(previous: MotorsportRaceState, config: MotorsportRaceConfig
   if (state.flagUntil !== null && state.raceSeconds >= state.flagUntil) {
     state.flag = 'green'; state.flagUntil = null; appendEvent(state, null, 'GREEN. Neutralisation ends.')
   }
-  if (state.flag === 'red') return state
+  if (state.flag === 'red') return { ...state, cars: previous.cars.map(car => ({ ...car, lapInvalid: true, ...(car.timing ? { timing: { ...car.timing, invalid: true } } : {}) })) }
   const entries = new Map(config.entries.map(entry => [entry.id, entry]))
   const physicalOrder = previous.cars.filter(car => car.status === 'running')
     .sort((a, b) => modulo(a.distanceM, length) - modulo(b.distanceM, length) || a.entryId.localeCompare(b.entryId))
@@ -241,7 +243,7 @@ function advanceTick(previous: MotorsportRaceState, config: MotorsportRaceConfig
     const entry = entries.get(car.entryId)!, machine = entry.machine, driver = entry.drivers[car.driverIndex]
     const beforeDistance = car.distanceM
     car.hybridPowerKw = 0; car.regenerationPowerKw = 0
-    if (car.status !== 'running') car.lapInvalid = true
+    if (car.status !== 'running' || state.flag !== 'green') car.lapInvalid = true
     if (car.status !== 'running') {
       const pitLimit = config.course.pitSpeedKph.value / 3.6
       car.speedMps = car.status === 'pit-service' ? 0 : car.speedMps + clamp(pitLimit - car.speedMps, -6 * dt, 3 * dt)
@@ -277,7 +279,23 @@ function advanceTick(previous: MotorsportRaceState, config: MotorsportRaceConfig
         }
       } else {
         const pitAhead = previous.cars.filter(other=>other.entryId!==car.entryId && (other.status==='pit-exit' || other.status==='pit-entry') && (other.pitPathM>car.pitPathM || other.pitPathM===car.pitPathM && other.entryId.localeCompare(car.entryId)<0)).sort((a,b)=>a.pitPathM-b.pitPathM)[0]
-        const step = pitAhead ? Math.min(car.speedMps*dt,Math.max(0,pitAhead.pitPathM + pitAhead.speedMps*dt-car.pitPathM-6)) : car.speedMps*dt
+        const pitEnd = config.course.pitLengthM.value
+        const remaining = pitEnd - car.pitPathM
+        // Join only into a clear gap. Include approaching traffic across the
+        // control line, regardless of its lap count; never spawn onto a car.
+        const mergeDistance = car.distanceM + remaining / pitEnd * modulo(config.course.pitExit.value - config.course.pitEntry.value, 1) * length
+        const mergeBlocked = car.status === 'pit-exit' && remaining < Math.max(12, car.speedMps ** 2 / 12 + 6) && previous.cars.some(other => {
+          if (other.entryId === car.entryId || other.status !== 'running') return false
+          const gap = modulo(other.distanceM + other.speedMps * dt - mergeDistance + length / 2, length) - length / 2
+          return gap < 6 && gap > -Math.max(6, other.speedMps * 0.7)
+        })
+        if (mergeBlocked) {
+          const safeSpeed = Math.sqrt(12 * Math.max(0, remaining - 0.5))
+          car.speedMps = Math.min(car.speedMps, safeSpeed)
+          car.throttlePercent = 0; car.brakePercent = 50
+        }
+        let step = pitAhead ? Math.min(car.speedMps*dt,Math.max(0,pitAhead.pitPathM + pitAhead.speedMps*dt-car.pitPathM-6)) : car.speedMps*dt
+        step = Math.min(step, Math.max(0, (car.status === 'pit-entry' ? pitEnd * 0.5 : pitEnd - (mergeBlocked ? 0.5 : 0)) - car.pitPathM))
         car.speedMps = step/dt
         car.pitPathM += step
         const pitArc = modulo(config.course.pitExit.value - config.course.pitEntry.value, 1) * length
@@ -419,6 +437,7 @@ function advanceTick(previous: MotorsportRaceState, config: MotorsportRaceConfig
         appendEvent(state, car.entryId, 'Retired: fuel exhausted.')
       }
     }
+    advanceSectorTiming(car, beforeDistance, previous.raceSeconds, dt, config.course, state.flag === 'green')
     const completedBefore = Math.max(0, Math.floor(beforeDistance / length))
     const completedAfter = Math.max(0, Math.floor(car.distanceM / length))
     if (completedAfter > completedBefore) {
@@ -428,7 +447,7 @@ function advanceTick(previous: MotorsportRaceState, config: MotorsportRaceConfig
       const crossing = previous.raceSeconds + dt * fraction
       const lapTime = crossing - car.lapStartedAt
       const timed = config.sessionKind === 'practice' || config.sessionKind === 'qualifying'
-      const validLap = !timed || (completedBefore > 0 && !car.lapInvalid && car.status === 'running')
+      const validLap = !car.lapInvalid && car.status === 'running' && (!timed || completedBefore > 0)
       car.lastLapSeconds = lapTime
       if (validLap) car.bestLapSeconds = Math.min(car.bestLapSeconds ?? Infinity, lapTime)
       car.lapHistory = [...(car.lapHistory ?? []), { lap: completedAfter, seconds: lapTime, driverIndex: car.driverIndex, compound: car.tyreSets.at(-1)!.compound, pit: !validLap || car.status !== 'running' }].slice(-1000)
