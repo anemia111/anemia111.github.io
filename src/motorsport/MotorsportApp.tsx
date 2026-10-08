@@ -17,7 +17,7 @@ import type { MotorsportQualifyingResult } from './freeMode'
 import { dashboardCourse, dashboardFrame } from './dashboardAdapter'
 import '../App.css'
 const RaceScene = lazy(() => import('../three/RaceScene').then(module => ({default: module.RaceScene})))
-import { createMotorsportConfig, motorsportChampionships, motorsportCourses, motorsportEvents } from './packages'
+import { createMotorsportConfig, motorsportCourses, motorsportEvents } from './packages'
 import { advanceMotorsportRace, createMotorsportRace, motorsportStandings, requestMotorsportPit, setMotorsportFlag } from './race'
 import { MOTORSPORT_SAVE_KEY, parseMotorsportSave, serializeMotorsportSave } from './persistence'
 import type { ChampionshipId, MotorsportPitRequest, MotorsportRaceConfig, MotorsportRaceState } from './types'
