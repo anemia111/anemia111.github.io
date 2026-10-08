@@ -174,7 +174,7 @@ export function setMotorsportFlag(state: MotorsportRaceState, flag: MotorsportRa
 }
 
 /** Passing prepares a physically close train for the actual faster car. */
-function yieldingCars(state: MotorsportRaceState, config: MotorsportRaceConfig, physicalOrder: MotorsportCar[]): Set<string> {
+function yieldingCars(state: MotorsportRaceState, config: MotorsportRaceConfig, physicalOrder: MotorsportCar[], freeSpeeds: Map<string, number>): Set<string> {
   const yielding = new Set<string>()
   if (state.flag !== 'green' || config.championship === 'indycar') return yielding
   const length = config.course.lengthM
@@ -188,7 +188,8 @@ function yieldingCars(state: MotorsportRaceState, config: MotorsportRaceConfig, 
       const car = physicalOrder[(index + offset) % physicalOrder.length]
       const gap = modulo(car.distanceM - overtaker.distanceM, length)
       if (gap > reach) break
-      if (gap <= 0 || overtaker.speedMps <= car.speedMps + 2 ||
+      if (gap <= 0 || (overtaker.speedMps <= car.speedMps + 2 &&
+        (freeSpeeds.get(overtaker.entryId) ?? overtaker.speedMps) <= (freeSpeeds.get(car.entryId) ?? car.speedMps) + 2) ||
         (overtaker.distanceM - car.distanceM < length * 0.8 && classFor.get(overtaker.entryId) === classFor.get(car.entryId))) continue
       if (tail < 0 ? gap <= Math.max(70, overtaker.speedMps * 1.5) : gap - tail < 55) {
         yielding.add(car.entryId); tail = gap
@@ -217,7 +218,16 @@ function advanceTick(previous: MotorsportRaceState, config: MotorsportRaceConfig
   const entries = new Map(config.entries.map(entry => [entry.id, entry]))
   const physicalOrder = previous.cars.filter(car => car.status === 'running')
     .sort((a, b) => modulo(a.distanceM, length) - modulo(b.distanceM, length) || a.entryId.localeCompare(b.entryId))
-  const yields = yieldingCars(previous, config, physicalOrder)
+  // Free-running capability survives matching the speed of the car ahead.
+  // Using only current speed makes a blocked car lose its passing intention.
+  const freeSpeeds = new Map(physicalOrder.map(car => {
+    const entry = entries.get(car.entryId)!
+    return [car.entryId, targetSpeedMps(config.course, entry.machine, car.distanceM, {
+      massKg: entry.machine.massKg.value + entry.machine.driverMassKg.value + car.fuelKg,
+      gripScale: tyreGripScale(car, config.weather),
+    })] as const
+  }))
+  const yields = yieldingCars(previous, config, physicalOrder, freeSpeeds)
   const nearestAhead = new Map<string, { car: MotorsportCar; gap: number }>()
   if (physicalOrder.length > 1) physicalOrder.forEach((car, index) => {
     const next = physicalOrder[(index + 1) % physicalOrder.length]
@@ -306,8 +316,21 @@ function advanceTick(previous: MotorsportRaceState, config: MotorsportRaceConfig
       if (state.flag === 'yellow') target *= 0.7
       if (state.flag === 'sc') target = Math.min(target, 100 / 3.6)
       car.blueFlag = yields.has(car.entryId)
-      const overtaking = ahead && state.flag === 'green' && (car.speedMps > ahead.car.speedMps + 0.5 || car.distanceM - ahead.car.distanceM >= length * 0.8)
-      const desiredLateral = car.blueFlag ? config.course.widthM.value / 2 - 1.5 : overtaking ? -2.2 : 0
+      const aheadEntry = ahead ? entries.get(ahead.car.entryId)! : null
+      const accelerationAdvantage = aheadEntry && ahead
+        ? machine.powerKw.value * 1000 / (mass * Math.max(10, car.speedMps)) -
+          aheadEntry.machine.powerKw.value * 1000 / ((aheadEntry.machine.massKg.value + aheadEntry.machine.driverMassKg.value + ahead.car.fuelKg) * Math.max(10, ahead.car.speedMps))
+        : 0
+      const overtaking = ahead && !car.blueFlag && state.flag === 'green' && ahead.gap < Math.max(90, car.speedMps * 3) &&
+        (car.speedMps > ahead.car.speedMps + 0.5 ||
+          (target > ahead.car.speedMps + 0.75 &&
+            ((freeSpeeds.get(car.entryId) ?? target) > (freeSpeeds.get(ahead.car.entryId) ?? ahead.car.speedMps) + 0.75 || accelerationAdvantage > 0.3)) ||
+          car.distanceM - ahead.car.distanceM >= length * 0.8)
+      // Slower traffic holds a predictable line; the faster car finds space.
+      // Keep a committed passing side while alongside, and avoid choosing
+      // the same side as a car ahead that is itself already passing.
+      const passingSide = Math.abs(car.lateralM) >= 1 ? Math.sign(car.lateralM) : ahead && ahead.car.lateralM < -0.8 ? 1 : -1
+      const desiredLateral = car.blueFlag ? car.lateralM : overtaking ? passingSide * Math.min(2.2, config.course.widthM.value / 2 - 1.5) : 0
       car.lateralM += clamp(desiredLateral - car.lateralM, -2.5 * dt, 2.5 * dt)
       if (ahead && (state.flag !== 'green' || Math.abs(car.lateralM - ahead.car.lateralM) < 2.1)) {
         if (ahead.gap < Math.max(7, car.speedMps * 0.5)) target = Math.min(target, Math.max(0, ahead.car.speedMps + (ahead.gap - 7) * 0.5))

@@ -29,7 +29,7 @@ import {
   type OpenF1TrackProgress,
 } from '../services/openF1Location'
 import {
-  createTrackCurve,
+  createPresentationTrackCurve,
   createTrackRibbonGeometry,
   edgePoints,
   poseOnTrack,
@@ -37,6 +37,7 @@ import {
 
 type RaceSceneProps = {
   cameraMode: CameraMode
+  resetViewKey?: number
   config: RaceConfig
   onSelectDriver: (driverId: string) => void
   /** Factual OpenF1 car-progress overlay; null when off or unavailable. */
@@ -1392,6 +1393,7 @@ function OpenF1CarOverlay({
 
 function CameraRig({
   cameraMode,
+  resetViewKey,
   curve,
   selectedCar,
   selectedGarageBayIndex,
@@ -1402,6 +1404,7 @@ function CameraRig({
   track,
 }: {
   cameraMode: CameraMode
+  resetViewKey: number
   curve: THREE.CatmullRomCurve3
   selectedCar: CarSnapshot
   selectedGarageBayIndex: number
@@ -1411,8 +1414,9 @@ function CameraRig({
   snapshotElapsedSeconds: number
   track: TrackDefinition
 }) {
-  const { camera, invalidate, size } = useThree()
+  const { camera, gl, invalidate, size } = useThree()
   const controlsRef = useRef<OrbitControlsImpl | null>(null)
+  const userControlled = useRef(false)
   const targetRef = useRef(new THREE.Vector3(0, 0, 0))
   const overviewFrame = useMemo(() => {
     const bounds = new THREE.Box3().setFromPoints(curve.getSpacedPoints(320))
@@ -1453,6 +1457,42 @@ function CameraRig({
       ),
     }
   }, [camera, overviewFrame, size.height, size.width])
+  useEffect(() => {
+    userControlled.current = false
+    invalidate()
+  }, [cameraMode, curve, resetViewKey, invalidate])
+  useEffect(() => {
+    const canvas = gl.domElement
+    canvas.tabIndex = 0
+    canvas.setAttribute('aria-label', 'Interactive circuit map')
+    canvas.title = 'Wheel: zoom · Drag: rotate · Right drag: pan · Double-click: reset · Keys: + / −, ← / →, Home'
+    const reset = () => {
+      if (cameraMode !== 'overview') return
+      userControlled.current = false
+      invalidate()
+    }
+    const keydown = (event: KeyboardEvent) => {
+      if (cameraMode !== 'overview' || !controlsRef.current) return
+      if (event.key === 'Home') { event.preventDefault(); reset(); return }
+      if (!['+', '=', '-', 'ArrowLeft', 'ArrowRight'].includes(event.key)) return
+      event.preventDefault()
+      userControlled.current = true
+      const controls = controlsRef.current
+      const offset = camera.position.clone().sub(controls.target)
+      if (event.key === '+' || event.key === '=') offset.multiplyScalar(0.8)
+      else if (event.key === '-') offset.multiplyScalar(1.25)
+      else offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), event.key === 'ArrowLeft' ? Math.PI / 12 : -Math.PI / 12)
+      camera.position.copy(controls.target).add(offset)
+      controls.update()
+      invalidate()
+    }
+    canvas.addEventListener('dblclick', reset)
+    canvas.addEventListener('keydown', keydown)
+    return () => {
+      canvas.removeEventListener('dblclick', reset)
+      canvas.removeEventListener('keydown', keydown)
+    }
+  }, [cameraMode, camera, gl, invalidate])
   const selectedCameraFrame = useMemo(() => {
     const laneOffset = displayLaneOffset(
       track,
@@ -1492,10 +1532,13 @@ function CameraRig({
   useFrame(() => {
     const target = selectedCameraFrame.target
 
-    if (cameraMode === 'overview') {
+    if (cameraMode === 'overview' && !userControlled.current) {
       camera.position.lerp(overviewCamera.position, 0.12)
       targetRef.current.lerp(overviewCamera.target, 0.08)
-      camera.lookAt(targetRef.current)
+      // A nearly vertical lookAt with Y-up can roll with tiny horizontal
+      // interpolation errors. Lock the overview frame to world X / -Z.
+      camera.rotation.set(-Math.PI / 2, 0, 0)
+      controlsRef.current?.target.copy(targetRef.current)
 
       if (
         camera.position.distanceToSquared(overviewCamera.position) > 0.0004 ||
@@ -1530,12 +1573,13 @@ function CameraRig({
   return (
     <OrbitControls
       ref={controlsRef}
-      enabled={cameraMode === 'orbit'}
+      enabled={cameraMode !== 'chase'}
       enableDamping
-      maxDistance={58}
+      maxDistance={Math.max(180, overviewCamera.position.distanceTo(overviewCamera.target) * 4)}
       maxPolarAngle={Math.PI * 0.47}
       minDistance={8}
       onChange={() => invalidate()}
+      onStart={() => { if (cameraMode === 'overview') userControlled.current = true }}
       target={[0, 0, 0]}
     />
   )
@@ -1543,6 +1587,7 @@ function CameraRig({
 
 function SceneContents({
   cameraMode,
+  resetViewKey = 0,
   config,
   curve,
   edgeLeft,
@@ -1691,6 +1736,7 @@ function SceneContents({
       ) : null}
       <CameraRig
         cameraMode={cameraMode}
+        resetViewKey={resetViewKey}
         curve={curve}
         selectedCar={selectedCar}
         selectedGarageBayIndex={selectedGarageBayIndex}
@@ -1708,7 +1754,7 @@ function SceneContents({
 }
 
 export function RaceScene(props: RaceSceneProps) {
-  const curve = useMemo(() => createTrackCurve(props.config.track), [props.config.track])
+  const curve = useMemo(() => createPresentationTrackCurve(props.config.track), [props.config.track])
   const trackWidth = presentationTrackWidth(props.config.track)
   const roadGeometry = useMemo(
     () => createTrackRibbonGeometry(curve, trackWidth),
@@ -1725,7 +1771,7 @@ export function RaceScene(props: RaceSceneProps) {
 
   return (
     <Canvas
-      camera={{ fov: 48, near: 0.1, far: 220, position: [0, 47, 0.01] }}
+      camera={{ fov: 48, near: 0.1, far: 600, position: [0, 47, 0.01] }}
       className="race-canvas"
       dpr={[1, 1.35]}
       frameloop="demand"

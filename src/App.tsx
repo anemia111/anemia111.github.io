@@ -1355,6 +1355,7 @@ export default function App({ onOpenMotorsport, requestedSeriesId, requestedFree
     ? seriesPackage.rules
     : null
   const [cameraMode, setCameraMode] = useState<CameraMode>('overview')
+  const [resetViewKey, setResetViewKey] = useState(0)
   const [speed, setSpeed] = useState<SpeedMultiplier>(1)
   const [isPaused, setIsPaused] = useState(false)
   const [isSetupOpen, setIsSetupOpen] = useState(false)
@@ -4229,7 +4230,7 @@ export default function App({ onOpenMotorsport, requestedSeriesId, requestedFree
             : `${seriesPackage.shortLabel} ROUND ${selectedEvent.round} / ${track.location}`
         }
         isPaused={isPaused}
-        onCameraModeChange={setCameraMode}
+        onCameraModeChange={(mode) => { setCameraMode(mode); if (mode === 'overview') setResetViewKey(key => key + 1) }}
         onDataModeChange={setRequestedDataMode}
         onExitFreeMode={() => {
           if (applicationMode === 'free') {
@@ -4292,6 +4293,7 @@ export default function App({ onOpenMotorsport, requestedSeriesId, requestedFree
           >
             <RaceScene
               cameraMode={cameraMode}
+              resetViewKey={resetViewKey}
               config={raceConfig}
               onSelectDriver={focusDriver}
               openF1Overlay={

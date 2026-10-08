@@ -1,8 +1,28 @@
 import { describe, expect, it } from 'vitest'
 import * as THREE from 'three'
-import { poseOnTrack } from './trackGeometry'
+import { createTrackCurve, createPresentationTrackCurve, poseOnTrack } from './trackGeometry'
+import { tracks } from '../data/tracks'
+import { seriesPackageById } from '../series/seriesRegistry'
+import { createMotorsportConfig, motorsportChampionships, motorsportCourses } from '../motorsport/packages'
+import { dashboardCourse } from '../motorsport/dashboardAdapter'
 
 describe('track geometry poses', () => {
+  it('aligns every available control-line tangent horizontally without changing distance or progress', () => {
+    const native = [...tracks, ...seriesPackageById.get('super-formula')!.tracks]
+    const expansion = motorsportChampionships.flatMap(series => motorsportCourses(series.id).map(course => dashboardCourse({ ...createMotorsportConfig(series.id), course })))
+    for (const track of [...native, ...expansion]) {
+      const source = JSON.stringify(track.centerline)
+      const raw = createTrackCurve(track), display = createPresentationTrackCurve(track)
+      const tangent = display.getTangentAt(0)
+      expect(Math.abs(tangent.z), track.id).toBeLessThan(1e-7)
+      expect(tangent.x, track.id).toBeGreaterThan(0.999)
+      expect(display.getLength(), track.id).toBeCloseTo(raw.getLength(), 8)
+      for (const progress of [0, ...track.sectorMarks, 0.5, 0.999]) {
+        expect(display.getPointAt(progress).distanceTo(display.getPointAt(0)), track.id).toBeCloseTo(raw.getPointAt(progress).distanceTo(raw.getPointAt(0)), 8)
+      }
+      expect(JSON.stringify(track.centerline)).toBe(source)
+    }
+  })
   it('preserves a unit normal while applying the requested lateral offset', () => {
     const curve = new THREE.CatmullRomCurve3(
       [

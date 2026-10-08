@@ -50,6 +50,7 @@ export function MotorsportApp({ onBack, initialChampionship = 'kyojo', initialFr
   const applicationMode = config.applicationMode ?? 'championship'
   const stage: WeekendStage = config.sessionKind === 'practice' ? 'fp1' : config.sessionKind === 'qualifying' ? 'qualifying' : 'race'
   const [cameraMode, setCameraMode] = useState<CameraMode>('overview')
+  const [resetViewKey, setResetViewKey] = useState(0)
   const worker = useRef<Worker | null>(null)
   const latest = useRef({ config, state, paused, speed })
   latest.current = { config, state, paused, speed }
@@ -181,7 +182,7 @@ export function MotorsportApp({ onBack, initialChampionship = 'kyojo', initialFr
       dataDetails={[{label:'Selected car',value:`#${selected.entry.number} ${selected.entry.team}`,source:'SIM'}, {label:'Class',value:`${selected.entry.classId.toUpperCase()} P${selected.classPosition}`,source:'SIM'}, {label:'Fuel',value:`${selected.car.fuelKg.toFixed(1)} kg`,source:'SIM'}, {label:'Timing sections',value:track.sectorTimingUnavailableReason ?? `${track.sectorMarks.length} sections`,source:track.sectorBoundaryReference ? 'SIM' : 'UNAVAILABLE'}]}
       dataMode="SIM" dataModeAvailability={{SIM:true,HIST:false,LIVE:false}} engineLabel="SIM"
       environment={{airLabel:'—',trackLabel:'—',humidityLabel:'—',pressureLabel:'—',windLabel:'—',rainLabel:config.weather,source:'SIM'}}
-      eventName={config.course.name} isPaused={paused} onCameraModeChange={setCameraMode} onDataModeChange={() => {}}
+      eventName={config.course.name} isPaused={paused} onCameraModeChange={mode=>{setCameraMode(mode);if(mode==='overview')setResetViewKey(key=>key+1)}} onDataModeChange={() => {}}
       onFocusDriver={focusDriver}
       onExitFreeMode={exitFree} onOpenFreeMode={openFree}
       onOpenClassification={() => setPanel('classification')} onOpenInsights={() => setPanel('insights')} onOpenPitWall={() => setPanel('pit')} onOpenSetup={() => applicationMode === 'free' ? openFree() : setPanel('setup')}
@@ -195,7 +196,7 @@ export function MotorsportApp({ onBack, initialChampionship = 'kyojo', initialFr
       seriesOptions={seriesPackages.map(item => ({id:item.id,label:item.label}))}
       tireLabels={{S:'Not available',M:'Not available',H:'Not available',I:'Not available',W:'Not available'}} timingRows={timingRows} track={track}
       categoryPresentation={{seriesValue:`motorsport:${config.championship}`,systemsLabel:'SIM',tyreUsage,tyreLegend:<span>{config.weather.toUpperCase()} · SIM TYRES</span>,speeds:[1,5,20,60,600],telemetryCorners}}
-      trackScene={<Suspense fallback={<div className="scene-loading">Loading circuit map...</div>}><RaceScene cameraMode={cameraMode} config={sceneConfig} onSelectDriver={focusDriver} openF1Overlay={null} openF1OverlayMode="SIM" selectedDriverId={selected.entry.id} snapshot={snapshot}/></Suspense>}
+      trackScene={<Suspense fallback={<div className="scene-loading">Loading circuit map...</div>}><RaceScene cameraMode={cameraMode} resetViewKey={resetViewKey} config={sceneConfig} onSelectDriver={focusDriver} openF1Overlay={null} openF1OverlayMode="SIM" selectedDriverId={selected.entry.id} snapshot={snapshot}/></Suspense>}
       weekendStages={['fp1','qualifying','race']}
     />
     {freeOpen && <MotorsportFreeModeBuilder initialConfig={(() => { if(applicationMode === 'free') return config; if(freeSession.current) return freeSession.current.config; try { const raw=localStorage.getItem(MOTORSPORT_FREE_SAVE_KEY); const saved=raw&&parseMotorsportSave(raw); if(saved && (!initialFreeOpen || saved.config.championship === initialChampionship)) return saved.config } catch { /* Fresh configuration. */ } return config })()} qualifying={qualifying} onBaseCategory={id=>{rememberSession();onBack(id,true)}} onClose={() => setFreeOpen(false)} onStart={startFree}/>}

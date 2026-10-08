@@ -625,8 +625,15 @@ function isCompatibleEnergyStoreState(
       state.deployedAtCuKBusThisLapMJ + ENERGY_EPSILON ||
     state.deployedAtCuKBusThisLapMJ >
       state.energyRemovedThisLapMJ + ENERGY_EPSILON ||
-    (state.chargeDcPowerKw > ENERGY_EPSILON &&
-      state.dischargeDcPowerKw > ENERGY_EPSILON) ||
+    // These powers are averages over the integration interval. A transition
+    // from recovery to deployment can legitimately give both positive means;
+    // exclusivity applies to the internal substeps, not to this checkpoint.
+    state.chargeDcPowerKw > state.actualRecoveryPowerKw + ENERGY_EPSILON ||
+    !approximatelyEqual(state.dischargeDcPowerKw, state.actualDeploymentDcPowerKw) ||
+    state.storedChargePowerKw > state.chargeDcPowerKw + ENERGY_EPSILON ||
+    state.dischargeDcPowerKw > state.storedDischargePowerKw + ENERGY_EPSILON ||
+    !approximatelyEqual(state.motorMechanicalPowerKw,
+      state.actualDeploymentPowerKw - state.actualRecoveryPowerKw) ||
     !approximatelyEqual(
       state.conversionLossThisLapMJ,
       state.unattributedConversionLossThisLapMJ +

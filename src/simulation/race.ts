@@ -5568,6 +5568,11 @@ export function advanceRace(
           energyDeployedThisLapMj: energyStore.deployedAtCuKBusThisLapMJ,
           ersBatteryPercent: Math.round(energyStore.stateOfCharge * 100),
           ersPowerKw: energyStore.actualDeploymentPowerKw,
+          superClippingDurationSeconds: 0,
+          superClippingIntensity: 0,
+          superClippingRegenPowerKw: 0,
+          superClippingStartedAtSeconds: null,
+          superClippingStartedAtProgress: null,
         }
       }
 

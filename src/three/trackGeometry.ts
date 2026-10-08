@@ -10,6 +10,17 @@ export function createTrackCurve(track: TrackDefinition) {
   )
 }
 
+/** Rotate the display alone: the control-line tangent runs left to right. */
+export function createPresentationTrackCurve(track: TrackDefinition) {
+  const curve = createTrackCurve(track)
+  const tangent = curve.getTangentAt(0)
+  const angle = Math.atan2(tangent.z, tangent.x)
+  const axis = new THREE.Vector3(0, 1, 0)
+  for (const point of curve.points) point.applyAxisAngle(axis, angle)
+  curve.updateArcLengths()
+  return curve
+}
+
 export function poseOnTrack(
   curve: THREE.CatmullRomCurve3,
   progress: number,
