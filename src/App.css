@@ -4091,6 +4091,13 @@
     minmax(38px, 0.85fr) minmax(38px, 0.85fr)
     25px 25px 25px 18px minmax(30px, 0.42fr) 24px 26px;
 }
+.broadcast-class-leaderboards .sector-value > b { font-size: 7px; }
+.broadcast-class-leaderboards .has-four-sectors .leaderboard-column-head,
+.broadcast-class-leaderboards .has-four-sectors .leaderboard-rows button {
+  grid-template-columns: 20px minmax(48px, 0.62fr) 20px minmax(28px, 0.5fr)
+    minmax(38px, 0.85fr) minmax(38px, 0.85fr)
+    repeat(4, 25px) 18px minmax(30px, 0.42fr) 24px 26px;
+}
 
 /* Shared session chrome: native and expansion categories use identical sizing. */
 .setup-panel { font-size: 13px; }
