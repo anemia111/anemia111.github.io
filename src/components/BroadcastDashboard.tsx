@@ -1,4 +1,4 @@
-import { ExpansionCatalog } from './ExpansionCatalog'
+import { CompoundUsageChart } from './CompoundUsageChart'
 import { TelemetryComparison } from './TelemetryComparison'
 import { profileDistanceKmBetween } from '../simulation/trackDynamics'
 import {
@@ -408,46 +408,7 @@ function TireUsage({
     )
   }
 
-  const total = Math.max(1, cars.length)
-  let offset = 0
-
-  return (
-    <div className="tyre-usage-content">
-      <svg aria-label="tyre compound usage" className="tyre-donut" viewBox="0 0 42 42">
-        <circle className="tyre-donut-base" cx="21" cy="21" fill="none" r="15.9" strokeWidth="6" />
-        {usage.map(([compound, count]) => {
-          const share = (count / total) * 100
-          const dashOffset = -offset
-          offset += share
-
-          return (
-            <circle
-              cx="21"
-              cy="21"
-              fill="none"
-              key={compound}
-              r="15.9"
-              stroke={tireColors[compound]}
-              strokeDasharray={`${share} ${100 - share}`}
-              strokeDashoffset={dashOffset}
-              strokeWidth="6"
-              transform="rotate(-90 21 21)"
-            />
-          )
-        })}
-      </svg>
-      <div className="tyre-usage-legend">
-        {usage.map(([compound, count]) => (
-          <div key={compound}>
-            <span className={`broadcast-tire tire-${compound}`}>{compound}</span>
-            <span>{labels[compound]}</span>
-            <strong>{count}</strong>
-            <small>{Math.round((count / total) * 100)}%</small>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
+  return <CompoundUsageChart items={usage.map(([compound,count])=>({id:compound,label:labels[compound],count,color:tireColors[compound],badgeClass:`tire-${compound}`}))}/>
 }
 
 function LeftLeaderboard({
@@ -658,7 +619,6 @@ function CenterView({
           <div key={detail.label}><span>{detail.label}</span><strong>{detail.value}</strong><SourceTag source={detail.source} /></div>
         ))}
       </div>
-        <ExpansionCatalog />
       </div>
       {dataControl}
     </div>

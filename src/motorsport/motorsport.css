@@ -1,6 +1,7 @@
-.motorsport-overlay { top: 64px; max-height: calc(100svh - 120px); }
 .motorsport-overlay .motorsport-header,.motorsport-overlay .motorsport-controls { display: grid; gap: 12px; }
 .motorsport-overlay label { display: grid; gap: 5px; }
+.motorsport-overlay .motorsport-header > label, .motorsport-overlay .motorsport-controls > label { margin-top: 10px; color: #b7c1d0; font-size: 13px; }
+.motorsport-overlay .motorsport-header > label select, .motorsport-overlay .motorsport-controls select, .motorsport-overlay .motorsport-controls input { min-height: 32px; padding: 6px 8px; border: 1px solid #294156; border-radius: 6px; background: #0c1925; color: #e5f4fa; font: inherit; }
 .motorsport-overlay select,.motorsport-overlay input[type=number] { width: 100%; }
 .motorsport-overlay table { width: 100%; border-collapse: collapse; font-size: 10px; }
 .motorsport-overlay td,.motorsport-overlay th { padding: 6px; border-bottom: 1px solid #263446; text-align: left; }
@@ -20,3 +21,18 @@
 .motorsport-pit-wall .pit-wall-body p { color: #9db0bd; line-height: 1.5; }
 .motorsport-pit-wall .pit-wall-body select { min-height: 28px; padding: 4px 6px; border: 1px solid #294156; border-radius: 3px; background: #091824; color: #e5f4fa; font: inherit; }
 .motorsport-pit-wall .pit-wall-body label:has(input[type=checkbox]) { display: flex; align-items: center; }
+
+.motorsport-overlay .motorsport-controls > button,
+.motorsport-overlay .motorsport-header > button {
+  min-height: 32px;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 7px;
+  padding: 6px 10px;
+  color: var(--text-main);
+  background: rgba(255,255,255,.08);
+  font: inherit;
+  cursor: pointer;
+}
+.motorsport-overlay .motorsport-controls > button:hover,
+.motorsport-overlay .motorsport-header > button:hover { background: rgba(255,255,255,.14); }
+.motorsport-overlay .motorsport-controls > button:disabled { opacity: .45; cursor: default; }

@@ -1198,42 +1198,11 @@ async function inspectExpansionCatalog(browser) {
   try {
     await page.goto(appUrl)
     await page.locator('.broadcast-sidebar button[title="Data"]').click()
-    const catalog = page.getByRole('region', { name: '2026追加カテゴリー収録データ' })
-    await catalog.waitFor({ state: 'visible' })
-    const summaries = catalog.locator('summary')
-    if (await summaries.count() !== 6) throw new Error('Expansion catalog missing categories')
-    const rowCounts = []
-    const assetCounts = []
-    for (let index = 0; index < 6; index++) {
-      await summaries.nth(index).click()
-      const detail = catalog.locator('details').nth(index)
-      rowCounts.push(await detail.locator('table').first().locator('tbody tr').count())
-      assetCounts.push({ machines: await detail.locator('.expansion-machine').count(),
-        courseShapes: await detail.locator('.expansion-course-grid svg').count(),
-        missingShapes: await detail.locator('.expansion-course-unavailable').count() })
-      const clipped = await detail.evaluate((element) => element.scrollWidth > element.clientWidth + 1)
-      if (clipped) throw new Error('Expansion catalog table overflows at 1280px')
-      if (await page.locator('.data-content').evaluate((element) => element.scrollWidth > element.clientWidth + 1)) throw new Error('Expansion data has horizontal overflow')
-      await detail.locator('table').last().scrollIntoViewIfNeeded()
-      const contentScroll = await inspectScroll(page.locator('.data-content'))
-      if (!contentScroll.reachedBottom || contentScroll.maxScrollTop <= 0) throw new Error('Expansion data cannot scroll to its last row')
-      await summaries.nth(index).click()
-    }
-    if (JSON.stringify(rowCounts) !== JSON.stringify([20, 14, 29, 33, 17, 18])) {
-      throw new Error(`Expansion catalog incorrect directory counts: ${rowCounts}`)
-    }
-    const expectedAssets = [[1, 1, 0], [3, 6, 0], [15, 6, 0], [6, 17, 0], [8, 8, 0], [9, 8, 0]]
-    if (JSON.stringify(assetCounts.map(({ machines, courseShapes, missingShapes }) => [machines, courseShapes, missingShapes])) !== JSON.stringify(expectedAssets)) {
-      throw new Error(`Expansion machine/course assets missing: ${JSON.stringify(assetCounts)}`)
-    }
-    if (!(await catalog.innerText()).includes('追加カテゴリー')) throw new Error('Catalog is missing runtime navigation guidance')
-    await summaries.first().click()
-    await catalog.locator('.expansion-machine').first().scrollIntoViewIfNeeded()
-    await page.screenshot({ path: join(artifactDirectory, 'expansion-catalog.png') })
-    return { rowCounts, assetCounts, allCourseShapesAvailable: true, noHorizontalOverflow: true }
-  } finally {
-    await page.close()
-  }
+    if (await page.locator('.expansion-catalog').count()) throw new Error('Removed category catalog is still displayed')
+    if (!(await page.locator('.data-detail-grid').isVisible())) throw new Error('Data controls missing')
+    await page.screenshot({ path: join(artifactDirectory, 'data-without-catalog.png') })
+    return { removed: true, originalDataView: true }
+  } finally { await page.close() }
 }
 
 const browser = await chromium.launch({ headless: true })
