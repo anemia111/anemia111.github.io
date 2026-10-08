@@ -179,7 +179,7 @@ export function MotorsportApp({ onBack, initialChampionship = 'kyojo', initialFr
 
   return <div className="race-shell" data-testid="motorsport-app">
     <BroadcastDashboard
-      applicationMode={applicationMode} cameraMode={cameraMode} dataControl={<div className="broadcast-data-control"><strong>{applicationMode === 'free' ? 'FREE · ' : ''}{label} · SIM</strong><span>{config.format.basis}</span><button type="button" onClick={()=>applicationMode === 'free' ? openFree() : setPanel('setup')}>{applicationMode === 'free' ? 'Edit Free Mode session' : 'Race setup'}</button></div>}
+      applicationMode={applicationMode} cameraMode={cameraMode} dataControl={<div className="broadcast-data-control"><strong>{applicationMode === 'free' ? 'FREE · ' : ''}{label} · SIM</strong><span>{config.format.kind === 'laps' ? `${config.format.laps} laps` : `${config.format.seconds / 3600} hours`}</span><button type="button" onClick={()=>applicationMode === 'free' ? openFree() : setPanel('setup')}>{applicationMode === 'free' ? 'Edit Free Mode session' : 'Race setup'}</button></div>}
       dataDetails={[{label:'Selected car',value:`#${selected.entry.number} ${selected.entry.team}`,source:'SIM'}, {label:'Class',value:`${selected.entry.classId.toUpperCase()} P${selected.classPosition}`,source:'SIM'}, {label:'Fuel',value:`${selected.car.fuelKg.toFixed(1)} kg`,source:'SIM'}]}
       dataMode="SIM" dataModeAvailability={{SIM:true,HIST:false,LIVE:false}} engineLabel="SIM"
       environment={{airLabel:'—',trackLabel:'—',humidityLabel:'—',pressureLabel:'—',windLabel:'—',rainLabel:config.weather,source:'SIM'}}

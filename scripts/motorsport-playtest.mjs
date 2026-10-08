@@ -85,6 +85,7 @@ try {
       await page.getByTitle('Data',{exact:true}).click()
       assert.equal(await page.locator('.expansion-catalog').count(),0)
       assert.equal(await page.locator('.broadcast-data-control').count(),1)
+      assert.ok(await page.locator('.broadcast-data-control').evaluate(element=>element.scrollWidth<=element.clientWidth+1),`${championship}: data controls overflow`)
       await page.screenshot({path:join(artifacts,`data-${championship}-${viewport.width}.png`),fullPage:true})
       await page.getByTitle('Data',{exact:true}).click()
 
