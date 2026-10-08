@@ -419,6 +419,7 @@ function LeftLeaderboard({
   rows,
   selectedDriverId,
   showCarNumbers,
+  showClassLabels = false,
   stage,
   title,
 }: {
@@ -429,6 +430,7 @@ function LeftLeaderboard({
   rows: BroadcastTimingRow[]
   selectedDriverId: string
   showCarNumbers: boolean
+  showClassLabels?: boolean
   stage: WeekendStage
   title: string
 }) {
@@ -493,7 +495,7 @@ function LeftLeaderboard({
                 </span>
                 <span className="leaderboard-driver">
                   <i style={{ backgroundColor: row.car.teamColor }} />
-                  <strong title={row.categoryDisplay ? `${row.car.driverName} / ${row.car.teamName} / ${row.categoryDisplay.classLabel}` : undefined}>{row.car.code}</strong>
+                  <span className="leaderboard-driver-identity"><strong title={row.categoryDisplay ? `${row.car.driverName} / ${row.car.teamName} / ${row.categoryDisplay.classLabel}` : undefined}>{row.car.code}</strong>{showClassLabels && row.categoryDisplay && <small className="leaderboard-class-label">{row.categoryDisplay.classId.toUpperCase()}</small>}</span>
                   {row.car.blueFlag ? (
                     <small className="blue-flag-label" title="Blue flag">
                       <Flag aria-hidden="true" size={7} /> BLUE
@@ -860,7 +862,7 @@ export function BroadcastDashboard({
           {classIds.length > 1 ? <div className="broadcast-class-leaderboards">{classIds.map(classId => <LeftLeaderboard
             key={classId} labels={tireLabels} mode={leaderboardMode} onFocusDriver={onFocusDriver} onModeChange={setLeaderboardMode}
             rows={timingRows.filter(row => row.categoryDisplay?.classId === classId).map(row => ({...row,displayPosition:row.categoryDisplay!.classPosition}))}
-            selectedDriverId={selectedCar.driverId} showCarNumbers stage={stage} title={`${classId.toUpperCase()} Leaderboard`}
+            selectedDriverId={selectedCar.driverId} showCarNumbers showClassLabels stage={stage} title={`${classId.toUpperCase()} Leaderboard`}
           />)}</div> : (
           <LeftLeaderboard
             labels={tireLabels}

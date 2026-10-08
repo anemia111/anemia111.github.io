@@ -3,6 +3,7 @@ import layoutsJson from '../data/expansionCourseLayouts.json'
 import { tracks } from '../data/tracks'
 import { supportSeriesTracks } from '../data/supportSeriesTracks'
 import { expansionCatalog, catalogCalendarFor } from './expansionCatalog'
+import { alignExpansionControlLine } from '../data/expansionTiming'
 
 export type TechnicalQuantity = {
   value: number | null
@@ -90,7 +91,7 @@ export function courseAssetsFor(categoryId: string): ExpansionCourseAsset[] {
     }
     const layout = newLayouts.get(id)
     if (layout) return {
-      id, name: event.trackName, centerline: layout.centerlineMeters as Array<[number, number]>,
+      id, name: event.trackName, centerline: alignExpansionControlLine(id, layout.centerlineMeters as Array<[number, number]>),
       publishedLengthMeters: layout.publishedLengthMeters, measuredLengthMeters: layout.measuredLengthMeters,
       sourceUrl: layout.geometrySourceUrl, geometryStatus: 'geometryBasis' in layout && layout.geometryBasis === 'official-map-trace' ? 'official-map-trace' as const : 'osm-centerline' as const, notes: layout.notes,
     }

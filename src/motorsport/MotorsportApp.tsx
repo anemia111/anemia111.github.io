@@ -180,7 +180,7 @@ export function MotorsportApp({ onBack, initialChampionship = 'kyojo', initialFr
   return <div className="race-shell" data-testid="motorsport-app">
     <BroadcastDashboard
       applicationMode={applicationMode} cameraMode={cameraMode} dataControl={<div className="broadcast-data-control"><strong>{applicationMode === 'free' ? 'FREE · ' : ''}{label} · SIM</strong><span>{config.format.kind === 'laps' ? `${config.format.laps} laps` : `${config.format.seconds / 3600} hours`}</span><button type="button" onClick={()=>applicationMode === 'free' ? openFree() : setPanel('setup')}>{applicationMode === 'free' ? 'Edit Free Mode session' : 'Race setup'}</button></div>}
-      dataDetails={[{label:'Selected car',value:`#${selected.entry.number} ${selected.entry.team}`,source:'SIM'}, {label:'Class',value:`${selected.entry.classId.toUpperCase()} P${selected.classPosition}`,source:'SIM'}, {label:'Fuel',value:`${selected.car.fuelKg.toFixed(1)} kg`,source:'SIM'}]}
+      dataDetails={[{label:'Selected car',value:`#${selected.entry.number} ${selected.entry.team}`,source:'SIM'}, {label:'Class',value:`${selected.entry.classId.toUpperCase()} P${selected.classPosition}`,source:'SIM'}, {label:'Fuel',value:`${selected.car.fuelKg.toFixed(1)} kg`,source:'SIM'}, {label:'Timing sections',value:track.sectorTimingUnavailableReason ?? `${track.sectorMarks.length} sections · map-aligned (derived)`,source:track.sectorBoundaryReference ? 'OFF' : 'UNAVAILABLE'}]}
       dataMode="SIM" dataModeAvailability={{SIM:true,HIST:false,LIVE:false}} engineLabel="SIM"
       environment={{airLabel:'—',trackLabel:'—',humidityLabel:'—',pressureLabel:'—',windLabel:'—',rainLabel:config.weather,source:'SIM'}}
       eventName={config.course.name} isPaused={paused} onCameraModeChange={setCameraMode} onDataModeChange={() => {}}
@@ -232,6 +232,7 @@ export function MotorsportApp({ onBack, initialChampionship = 'kyojo', initialFr
     </section>
     {sourceOpen && <section className="motorsport-sources">
       <h2>確認できる条件</h2><p>開催・エントリー・公表諸元と、走行に使う推定値を区別しています。BoP、タイヤ・空力特性、燃料消費、コース運用位置には未校正の値があります。実測レースの再現性は検証中です。</p>
+      <p>区間計測：{track.sectorBoundaryReference ? <><a href={safeUrl(track.sectorBoundaryReference.sourceUrl)} target="_blank" rel="noreferrer">公式計測図</a>（{track.sectorBoundaryReference.year}年資料）。公表された区間を参照し、公開走路形状との位置合わせは図から推定しています。鈴鹿の区間距離と一部資料の距離整合補正は推定を含み、実測の計測線座標ではありません。</> : track.sectorTimingUnavailableReason}</p>
       <p>大会：<a href={safeUrl(currentEvent?.sourceUrl ?? '')} target="_blank" rel="noreferrer">公式資料</a> · 距離設定：{config.format.basis} · コース：<a href={safeUrl(config.course.sourceUrl)} target="_blank" rel="noreferrer">{config.course.geometryBasis}</a></p>
       <p>ピット入口・出口・通路長、制限速度、幅員は現在SIM設定です。年間名簿と当該大会の確定エントリーは同一とは限りません。WECモンツァ、KYOJO第2戦以降、SUPER GTは年間登録を参照しています。INDYCARのP2P・ハイブリッド展開枠、タイヤ特性はSIM初期値を含みます。</p>
       <table><thead><tr><th>選択車両</th><th>値</th><th>根拠</th></tr></thead><tbody>{Object.entries(selected.entry.machine).filter(([, value]) => typeof value === 'object' && value !== null && 'basis' in value).map(([key, value]) => { const item = value as { value: number; basis: string; source: string }; return <tr key={key}><td>{key}</td><td>{item.value.toFixed(3)}</td><td>{item.basis} · {item.source}</td></tr> })}</tbody></table>

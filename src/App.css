@@ -4076,3 +4076,6 @@
   bottom: 52px;
   max-height: min(60svh, calc(100svh - 112px));
 }
+
+.leaderboard-driver-identity { display: grid; min-width: 0; gap: 1px; }
+.leaderboard-driver .leaderboard-class-label { color: #a6cfed; font-size: 8px; font-weight: 700; line-height: 9px; white-space: nowrap; }

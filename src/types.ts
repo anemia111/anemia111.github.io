@@ -889,6 +889,9 @@ export type TrackDefinition = {
   raceLapsSource?: 'official' | 'estimated'
   sectorMarks: number[]
   sectorMarksSource?: OperationalDataSource
+  sectorTimingUnavailableReason?: string
+  /** Published section names for series using timing loops instead of F1 sectors. */
+  sectorLabels?: string[]
   /** Runtime control-line progress -> generated geodata's original origin. */
   measuredRoadProgressOffset?: number
   sectorBoundaryReference?: {

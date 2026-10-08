@@ -2,6 +2,7 @@ import { Line, OrbitControls } from '@react-three/drei'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { memo, Suspense, useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
+import { sectorPresentationSpans } from './sectorPresentation'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 import type {
   CameraMode,
@@ -58,7 +59,7 @@ type SceneContentsProps = RaceSceneProps & {
 const PIT_ENTRY_VISUAL_SECONDS = 3.2
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value))
-const sectorPathColors = ['#00d8ff', '#ffd21f', '#ff344d', '#bb89ff']
+const sectorPathColors = ['#00d8ff', '#ffd21f', '#ff344d', '#bb89ff', '#4ae7a2']
 const sectorFlagColors: Record<RaceSnapshot['sectorFlags'][number], string> = {
   clear: '#35d66f',
   'double-yellow': '#ffe35a',
@@ -853,13 +854,7 @@ function SectorPathLinesContent({
   yellowZone: YellowFlagZone | null
 }) {
   const sectors = useMemo(() => {
-    const starts = track.sectorMarks.length >= 3
-      ? track.sectorMarks
-      : [0, 1 / 3, 2 / 3]
-
-    return starts.map((start, index) => {
-      const end = starts[index + 1] ?? 1
-      const span = end > start ? end - start : end + 1 - start
+    return sectorPresentationSpans(track.sectorMarks).map(({ start, span }) => {
       const points = Array.from({ length: 45 }, (_, pointIndex) => {
         const progress = (start + (pointIndex / 44) * span) % 1
 
@@ -930,8 +925,8 @@ function SectorPathLinesContent({
               position={sector.labelPose.position.setY(0.56)}
               text={
                 isControlled
-                  ? `${sectorFlagLabels[flag]} S${index + 1}`
-                  : `SECTOR ${index + 1}`
+                  ? `${sectorFlagLabels[flag]} ${track.sectorLabels?.[index] ?? `S${index + 1}`}`
+                  : track.sectorLabels?.[index] ?? `SECTOR ${index + 1}`
               }
             />
           </group>

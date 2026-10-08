@@ -1,4 +1,5 @@
 import { phaseOneConfig } from '../data/phaseOne'
+import { expansionCourseTiming } from '../data/expansionTiming'
 import { createInitialRace } from '../simulation/race'
 import type { BroadcastTimingRow } from '../components/BroadcastDashboard'
 import type { RaceConfig, RaceSnapshot, TrackDefinition } from '../types'
@@ -12,12 +13,12 @@ export function dashboardCourse(config: MotorsportRaceConfig): TrackDefinition {
   const points = Array.from({ length: 512 }, (_, index) => coursePosition(config.course, index / 512 * config.course.lengthM))
   const xs = points.map(p => p[0]), ys = points.map(p => p[1])
   const cx = (Math.max(...xs) + Math.min(...xs)) / 2, cy = (Math.max(...ys) + Math.min(...ys)) / 2
-  const scale = 180 / Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys))
+  const scale = 48 / Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys))
   return { id: config.course.id, name: config.course.name, location: config.course.name,
     kind: config.course.kind === 'street' ? 'street' : 'permanent', feature: config.course.geometryBasis,
     isSprintWeekend: false, rainProbability: 0, centerline: points.map(([x,y]) => [(x-cx)*scale,0,(y-cy)*scale]),
     width: 4, lengthKm: config.course.lengthM / 1000, lengthSource: 'official', baseLapTime: 100,
-    sectorMarks: [], activeAeroUnavailable: true,
+    ...expansionCourseTiming(config.course.id, config.course.points), activeAeroUnavailable: true,
     layoutSource: { detail: 'real', provider: 'fallback', label: config.course.geometryBasis, url: config.course.sourceUrl, year: 2026 } }
 }
 export function dashboardFrame(config: MotorsportRaceConfig, state: MotorsportRaceState, track: TrackDefinition) {
