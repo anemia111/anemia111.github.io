@@ -44,6 +44,9 @@ try {
         const identity = label.locator('..')
         const nameBounds = await identity.locator('strong').boundingBox(), labelBounds = await label.boundingBox()
         assert.ok(nameBounds && labelBounds && labelBounds.y >= nameBounds.y + nameBounds.height - 1, `${championship}: class below driver name`)
+        const driverBounds = await identity.locator('..').boundingBox()
+        assert.ok(driverBounds && labelBounds.x + labelBounds.width <= driverBounds.x + driverBounds.width + 1, `${championship}: class fits driver cell`)
+        assert.ok(await label.evaluate(element => element.scrollWidth <= element.clientWidth + 1), `${championship}: class text is not clipped`)
         assert.match(await label.textContent(), /^(GT500|GT300|HYPERCAR|LMGT3)$/)
       }
       await page.getByRole('button', { name: 'Close panel', exact: true }).click()
