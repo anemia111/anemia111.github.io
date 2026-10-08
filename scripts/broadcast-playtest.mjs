@@ -881,6 +881,8 @@ async function inspectSeriesModes(browser) {
   await page.locator('.broadcast-sidebar .sidebar-settings').click()
   await page.waitForSelector('.setup-panel')
   await page.getByLabel('Championship round').selectOption('sf-03-replacement')
+  // Check scheduled distance without random wet/aborted-start lap reductions.
+  await page.getByLabel('Seed', { exact: true }).fill('sf-calendar-dry-0')
   await page.waitForFunction(
     () =>
       document.querySelector('select[aria-label="Weekend session"]')?.value ===
