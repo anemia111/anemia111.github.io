@@ -1,4 +1,6 @@
 import { ExpansionCatalog } from './ExpansionCatalog'
+import { TelemetryComparison } from './TelemetryComparison'
+import { profileDistanceKmBetween } from '../simulation/trackDynamics'
 import {
   Activity,
   Database,
@@ -43,7 +45,7 @@ import type { SeriesId } from '../series/types'
 import type { ApplicationMode } from '../freeMode/types'
 
 type DataMode = 'SIM' | 'HIST' | 'LIVE'
-type DashboardView = 'map' | 'data'
+type DashboardView = 'map' | 'data' | 'telemetry'
 
 const practiceProgramLabels: Record<
   NonNullable<CarSnapshot['practiceProgram']>,
@@ -115,7 +117,7 @@ export type BroadcastDataDetail = {
 
 
 type BroadcastDashboardProps = {
-  categoryPresentation?: { seriesValue: string; systemsLabel: string; tyreUsage: ReactNode; tyreLegend: ReactNode; speeds: number[] }
+  categoryPresentation?: { seriesValue: string; systemsLabel: string; tyreUsage: ReactNode; tyreLegend: ReactNode; speeds: number[]; telemetryCorners?: {label: string; progress: number}[] }
   applicationMode: ApplicationMode
   cameraMode: CameraMode
   dataControl: ReactNode
@@ -206,6 +208,7 @@ const dashboardViews: Array<{
   label: string
 }> = [
   { Icon: Database, id: 'data', label: 'Data' },
+  { Icon: Activity, id: 'telemetry', label: 'Telemetry' },
 ]
 
 const defaultTireLabels: Record<TireCompound, string> = {
@@ -710,6 +713,11 @@ export function BroadcastDashboard({
   const [leaderboardMode, setLeaderboardMode] = useState<'live' | 'gap'>('live')
   const [showLiveTiming, setShowLiveTiming] = useState(true)
   const classIds = categoryPresentation ? ['gt500','gt300','hypercar','lmp2','lmgt3','kyojo','indycar'].filter(id => timingRows.some(row => row.categoryDisplay?.classId === id)) : []
+  const telemetryCorners = useMemo(() => categoryPresentation?.telemetryCorners ?? (track.corners ?? []).map(corner=>{
+    let nearest=0, distance=Infinity
+    track.centerline.forEach((point,index)=>{const value=Math.hypot(point[0]-corner.position[0],point[2]-corner.position[2]);if(value<distance){distance=value;nearest=index}})
+    return {label:`T${corner.number}`,progress:profileDistanceKmBetween(track,0,nearest/track.centerline.length)/track.lengthKm}
+  }),[categoryPresentation?.telemetryCorners,track])
 
   useEffect(() => {
     if (dataMode !== 'SIM' && cameraMode !== 'overview') {
@@ -799,7 +807,7 @@ export function BroadcastDashboard({
             {seriesOptions.map((series) => (
               <option key={series.id} value={series.id}>{series.label}</option>
             ))}
-            {onOpenMotorsport && <optgroup label="2026 MOTORSPORT"><option value="motorsport:kyojo">KYOJO CUP</option><option value="motorsport:super-gt">SUPER GT</option><option value="motorsport:wec">FIA WEC</option><option value="motorsport:indycar">INDYCAR</option></optgroup>}
+            {onOpenMotorsport && <><option value="motorsport:kyojo">KYOJO CUP</option><option value="motorsport:super-gt">SUPER GT</option><option value="motorsport:wec">FIA WEC</option><option value="motorsport:indycar">INDYCAR</option></>}
           </select>
         </div>
         <div className="broadcast-session-core">
@@ -948,6 +956,14 @@ export function BroadcastDashboard({
                   </span>
                 )}
               </div>
+            </div>
+          </section>
+          ) : activeView === 'telemetry' ? (
+          <section className="broadcast-panel broadcast-telemetry-panel" aria-label="Telemetry workspace">
+            <PanelHeader title="Telemetry comparison" action={<button aria-label="Close telemetry comparison" className="panel-close" onClick={()=>setActiveView('map')} type="button"><X size={13}/></button>}/>
+            <div className="telemetry-workspace">
+              <label className="telemetry-primary-car">車両A<select aria-label="Telemetry primary car" value={selectedCar.driverId} onChange={event=>onFocusDriver(event.target.value)}>{snapshot.cars.map(car=><option key={car.driverId} value={car.driverId}>#{car.carNumber} {car.driverName}</option>)}</select></label>
+              <TelemetryComparison selectedId={selectedCar.driverId} lengthM={track.lengthKm*1000} traces={snapshot.cars.map(car=>({id:car.driverId,name:`#${car.carNumber} ${car.driverName}`,color:car.teamColor,samples:car.telemetryHistory ?? []}))} corners={telemetryCorners}/>
             </div>
           </section>
           ) : (

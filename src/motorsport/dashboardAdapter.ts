@@ -40,7 +40,7 @@ export function dashboardFrame(config: MotorsportRaceConfig, state: MotorsportRa
       position: overallPosition, gridPosition: config.entries.indexOf(entry) + 1, lap: car.laps + 1,
       totalDistance: distance / config.course.lengthM, progress: ((distance / config.course.lengthM) % 1 + 1) % 1,
       lateralOffsetM: 0, trackLateralOffset: 0, desiredLateralOffsetM: 0,
-      lastLapTimeSeconds: car.lastLapSeconds, bestLapTimeSeconds: car.bestLapSeconds,
+      lastLapTimeSeconds: car.lastLapSeconds, bestLapTimeSeconds: car.bestLapSeconds, telemetryHistory: car.telemetryHistory,
       currentLapSectorTimes: [], currentLapMiniSectorTimes: [], lapHistory: [],
       gapToLeaderLabel: classIndex === 0 ? 'LEADER' : interval(classLeader),
       gapToAheadLabel: classIndex === 0 ? 'LEADER' : interval(classCars[classIndex-1].car),

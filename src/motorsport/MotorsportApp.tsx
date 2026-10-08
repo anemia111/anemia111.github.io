@@ -193,7 +193,7 @@ export function MotorsportApp({ onBack, initialChampionship = 'kyojo', initialFr
       snapshot={snapshot} speed={speed as SpeedMultiplier} stage={stage} seriesId="f1-custom" seriesLabel={label}
       seriesOptions={seriesPackages.map(item => ({id:item.id,label:item.label}))}
       tireLabels={{S:'Not available',M:'Not available',H:'Not available',I:'Not available',W:'Not available'}} timingRows={timingRows} track={track}
-      categoryPresentation={{seriesValue:`motorsport:${config.championship}`,systemsLabel:'SIM',tyreUsage,tyreLegend:<span>{config.weather.toUpperCase()} · SIM TYRES</span>,speeds:[1,5,20,60,600]}}
+      categoryPresentation={{seriesValue:`motorsport:${config.championship}`,systemsLabel:'SIM',tyreUsage,tyreLegend:<span>{config.weather.toUpperCase()} · SIM TYRES</span>,speeds:[1,5,20,60,600],telemetryCorners}}
       trackScene={<Suspense fallback={<div className="scene-loading">Loading circuit map...</div>}><RaceScene cameraMode={cameraMode} config={sceneConfig} onSelectDriver={focusDriver} openF1Overlay={null} openF1OverlayMode="SIM" selectedDriverId={selected.entry.id} snapshot={snapshot}/></Suspense>}
       weekendStages={['fp1','qualifying','race']}
     />
