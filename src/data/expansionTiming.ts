@@ -17,10 +17,11 @@ const wec = (event: string, file = 'Circuit%20Map.pdf') =>
 type ExpansionTimingReference = {
   lengthM: number; cumulativeM: number[]; sourceUrl: string
   controlPoint?: number[]; reverse?: boolean; labels?: string[]
+  year?: number
 }
 export const expansionTimingReferences: Record<string, ExpansionTimingReference> = {
   ...Object.fromEntries(indyTiming.references.map(reference => [reference.id, reference])),
-  okayama: { lengthM: 3703, cumulativeM: [0, 962, 2520],
+  okayama: { year: 2025, lengthM: 3703, cumulativeM: [0, 962, 2520],
     sourceUrl: 'https://www.okayama-international-circuit.jp/guide/pdf/course.pdf',
     // Registration of the control line on the operator's course diagram.
     controlPoint: [-83.133, -287.006] },
@@ -65,11 +66,12 @@ export function expansionCourseTiming(id: string, points: Array<[number, number]
   let referencePoints: Array<[number, number]> | undefined
   let marks: number[] | undefined
   let lengthKm: number | undefined
-  let year = 2026
+  let year: number | undefined = 2026
   let labels: string[] | undefined
   if (domesticIds[id] && shared) {
     marks = shared.sectorMarks
     source = shared.sectorBoundaryReference?.sourceUrl
+    year = shared.sectorBoundaryReference?.year
     lengthKm = shared.lengthKm
     referencePoints = shared.centerline.map(([x, , z]) => [x, -z])
   } else if (id === 'suzuka' && shared) {
@@ -84,6 +86,7 @@ export function expansionCourseTiming(id: string, points: Array<[number, number]
     if (reference) {
       marks = reference.cumulativeM.map(m => m / reference.lengthM)
       source = reference.sourceUrl; lengthKm = reference.lengthM / 1000
+      year = reference.year ?? 2026
       labels = reference.labels
       referencePoints = shared ? shared.centerline.map(([x, , z]) => [x, -z])
         : alignExpansionControlLine(id, layouts.layouts.find(layout => layout.id === id)!.centerlineMeters as Array<[number, number]>)
