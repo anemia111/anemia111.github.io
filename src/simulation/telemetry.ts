@@ -1,4 +1,6 @@
 import { advancePedals } from './pedalControl'
+import { raceTyreGrip } from './raceTyres'
+import { superFormulaSimulatedTyreFor } from './superFormulaLiveTires'
 import { advanceSfOts } from './sfOtsRuntime'
 import type {
   ExecutableSeriesId,
@@ -371,11 +373,13 @@ export function calculateCarTelemetry(options: {
       })
   const compoundGrip = f1Tires
     ? tireTrackGripMultiplier(f1Tires.tire, trackCondition)
-    : 1
-  // The F1 Pirelli runtime carries the state needed to resolve a live tyre
-  // force envelope. SUPER FORMULA deliberately has no equivalent coefficient
-  // state: its control-tire branch remains unavailable rather than borrowing
-  // an F1 zero-loss compatibility value.
+    : superFormulaRuntime
+      ? superFormulaRuntime.liveTires.activeSurface === 'wet'
+        ? trackCondition.surfaceWaterMm > 0.1 ? 1 : 0.78
+        : trackCondition.surfaceWaterMm > 0.28 ? 0.65 : 1
+      : 1
+  // F1 retains its Pirelli envelope. SF uses a separate control-tyre SIM
+  // envelope; unavailable supplier coefficients never become F1 compounds.
   const f1TireForceEnvelope =
     f1Tires !== null && categoryPhysics.id === 'f1-custom'
       ? f1TireForceEnvelopeFor({
@@ -402,7 +406,10 @@ export function calculateCarTelemetry(options: {
   const localGrip = clamp(
     surfaceGrip *
       compoundGrip *
-      (f1TireForceEnvelope?.gripMultiplier ?? 1),
+      (f1TireForceEnvelope?.gripMultiplier ?? (superFormulaRuntime ? raceTyreGrip(
+        superFormulaSimulatedTyreFor(superFormulaRuntime.liveTires, track.lengthKm), 'super-formula',
+        superFormulaRuntime.liveTires.activeSurface === 'wet' ? 'wet' : 'primary',
+      ) : 1)),
     // `tyreForces` is numerically stable down to 0.05. Keeping the same
     // lower boundary here ensures a wet/mismatched F1 tyre's dynamic-state
     // loss remains visible instead of being flattened by a compatibility

@@ -1,4 +1,6 @@
 import { phaseOneConfig } from '../data/phaseOne'
+import { advanceRaceTyre } from './raceTyres'
+import { superFormulaSimulatedTyreFor } from './superFormulaLiveTires'
 import {
   START_LIGHT_BUILD_SECONDS,
   START_LIGHT_MAXIMUM_HOLD_SECONDS,
@@ -6549,7 +6551,9 @@ export function advanceRace(
           f1Tires.tire,
           driverPerformanceAbility(driver, 'tireManagement'),
           config.track.tireNomination,
-          undefined,
+          (config.track.observedCalibration?.tireSampleCountByCompound[f1Tires.tire] ?? 0) >= 4
+            ? { degradationPerLapSeconds: config.track.observedCalibration?.tireDegradationByCompound[f1Tires.tire], sampleCount: config.track.observedCalibration?.tireSampleCountByCompound[f1Tires.tire] }
+            : undefined,
         )
       : null
     const wearScale = wearScaleForControlPhase(localControlPhase)
@@ -6876,7 +6880,18 @@ export function advanceRace(
               }
             : {},
         )
-      : displayTelemetry.runtimeSystems
+      : displayTelemetry.runtimeSystems.kind === 'super-formula'
+        ? { ...displayTelemetry.runtimeSystems, liveTires: {
+          ...displayTelemetry.runtimeSystems.liveTires,
+          simulatedPerformance: advanceRaceTyre(superFormulaSimulatedTyreFor(displayTelemetry.runtimeSystems.liveTires, config.track.lengthKm), {
+            category: 'super-formula', compound: displayTelemetry.runtimeSystems.liveTires.activeSurface === 'wet' ? 'wet' : 'primary',
+            seconds: deltaSeconds, distanceM: Math.max(0, totalDistance - car.totalDistance) * config.track.lengthKm * 1000, speedMps: displayTelemetry.speedKph / 3.6,
+            demand: Math.min(1.5, localDynamics.curvature + displayTelemetry.brakePercent / 100 * 0.4 + displayTelemetry.throttlePercent / 100 * 0.2) * wearScale.tire,
+            massRatio: fuelEffects.tireLoadMultiplier, management: driverPerformanceAbility(driver, 'tireManagement'), pace: racePaceMode,
+            trackC: trackTemperatureC, wet: localWeather !== 'clear',
+          }),
+        } }
+        : displayTelemetry.runtimeSystems
     // Surface temperature is a force-step input, not persisted car state.
     // Keeping it out of this spread ensures all F1 tyre state remains under
     // `runtimeSystems.tires` and SF snapshots never inherit an alias.

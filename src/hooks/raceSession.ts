@@ -907,7 +907,7 @@ function isCompatibleSuperFormulaLiveTires(
 ) {
   if (
     !isRecord(liveTires) ||
-    !hasExactKeys(liveTires, SUPER_FORMULA_LIVE_TIRE_KEYS) ||
+    !hasExactKeys(liveTires, new Set([...SUPER_FORMULA_LIVE_TIRE_KEYS, ...(Object.hasOwn(liveTires, 'simulatedPerformance') ? ['simulatedPerformance'] : [])])) ||
     !isRecord(liveTires.fitment) ||
     !hasExactKeys(
       liveTires.fitment,

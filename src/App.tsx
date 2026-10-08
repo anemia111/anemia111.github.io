@@ -1043,7 +1043,7 @@ const telemetryForCar = (
       : Math.round(car.throttlePercent),
     tireTemperatureC: f1Runtime
       ? Math.round(f1Runtime.tires.tireTemperatureC)
-      : null,
+      : superFormulaRuntime?.liveTires.simulatedPerformance?.surfaceC ?? null,
   }
 }
 
@@ -2895,8 +2895,8 @@ export default function App({ onOpenMotorsport, requestedSeriesId, requestedFree
           : {
               ...sharedTireModel,
               tireDisplay,
-              tireLifePercent: null,
-              tireModelSource: 'unavailable' as const,
+              tireLifePercent: car.runtimeSystems.kind === 'super-formula' && car.runtimeSystems.liveTires.simulatedPerformance ? car.runtimeSystems.liveTires.simulatedPerformance.life * 100 : null,
+              tireModelSource: car.runtimeSystems.kind === 'super-formula' && car.runtimeSystems.liveTires.simulatedPerformance ? 'simulation' as const : 'unavailable' as const,
               tirePaceDeltaSeconds: null,
             }
         const hasCurrentLapSector = car.currentLapSectorTimes.some(

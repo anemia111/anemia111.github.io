@@ -110,5 +110,15 @@ export function targetSpeedMps(course: MotorsportCourse, machine: MotorsportMach
   const envelope = speedEnvelope(course, machine, conditions)
   const exact = modulo(distanceM, course.lengthM) / course.lengthM * SAMPLE_COUNT
   const index = Math.floor(exact), fraction = exact - index
-  return envelope[index] + (envelope[(index + 1) % SAMPLE_COUNT] - envelope[index]) * fraction
+  const lower = envelope[index] + (envelope[(index + 1) % SAMPLE_COUNT] - envelope[index]) * fraction
+  if (!conditions) return lower
+  // Cached grip bins must not turn the first trace of wear into an abrupt
+  // five-percent planning loss. Interpolate adjacent solved envelopes while
+  // the instantaneous force ellipse continues to use exact tyre grip.
+  const grip = Math.max(0.2, conditions.gripScale), lo = Math.floor(grip * 20 + 1e-8) / 20
+  const weight = (grip - lo) * 20
+  if (weight <= 1e-8) return lower
+  const upper = speedEnvelope(course, machine, { ...conditions, gripScale: lo + 0.05 })
+  const high = upper[index] + (upper[(index + 1) % SAMPLE_COUNT] - upper[index]) * fraction
+  return lower + (high - lower) * weight
 }

@@ -1,4 +1,5 @@
 import { advancePedals } from '../simulation/pedalControl'
+import { advanceRaceTyre, initialRaceTyre } from '../simulation/raceTyres'
 import { recordTelemetry } from '../simulation/telemetryHistory'
 import { clamp, modulo, MOTORSPORT_STEP_SECONDS, targetSpeedMps, stationAt, tyreForceBudget } from './coursePhysics'
 import { drivetrainState, trafficAero, tyreGripScale } from './vehicleDynamics'
@@ -48,7 +49,7 @@ export function createMotorsportRace(config: MotorsportRaceConfig): MotorsportRa
     lateralM: index % 2 ? 1.5 : -1.5, gear: config.start === 'rolling' ? 2 : 1,
     fuelKg: entry.machine.fuelCapacityKg.value * clamp(config.startFuelFraction, 0, 1),
     virtualEnergyMj: entry.machine.virtualEnergyCapacityMj?.value ?? null,
-    hybridEnergyMj: entry.machine.hybridCapacityMj.value, tyreLife: 1, tyreTemperatureC: 65,
+    hybridEnergyMj: entry.machine.hybridCapacityMj.value, tyreLife: 1, tyreTemperatureC: 65, tyreState: initialRaceTyre(),
     tyreSets: [{ compound: config.weather === 'wet' ? 'wet' : 'primary', completedLaps: 0 }],
     driverIndex: 0, driverSeconds: entry.drivers.map(() => 0), driverLastOutSeconds: entry.drivers.map(() => -1), stintSeconds: 0,
     driverDistanceM: entry.drivers.map(() => 0), drivingStints: [], activeDrivingStart: null, activeDrivingEnd: 0, lastRefuelLap: 0,
@@ -226,7 +227,7 @@ function advanceTick(previous: MotorsportRaceState, config: MotorsportRaceConfig
     const entry = entries.get(car.entryId)!
     return [car.entryId, targetSpeedMps(config.course, entry.machine, car.distanceM, {
       massKg: entry.machine.massKg.value + entry.machine.driverMassKg.value + car.fuelKg,
-      gripScale: tyreGripScale(car, config.weather),
+      gripScale: tyreGripScale(car, config.weather, entries.get(car.entryId)!.classId, config.course.kind === 'short-oval' || config.course.kind === 'speedway'),
     })] as const
   }))
   const yields = yieldingCars(previous, config, physicalOrder, freeSpeeds)
@@ -251,6 +252,11 @@ function advanceTick(previous: MotorsportRaceState, config: MotorsportRaceConfig
       car.brakePercent = car.speedMps > pitLimit ? 50 : 0
       const pitDrivetrain = drivetrainState(machine, car.speedMps, car.gear)
       car.gear = pitDrivetrain.gear; car.rpm = pitDrivetrain.rpm
+      car.tyreState = advanceRaceTyre(car.tyreState ?? initialRaceTyre(car.tyreTemperatureC, car.tyreLife), {
+        category: entry.classId, compound: car.tyreSets.at(-1)?.compound ?? 'primary', seconds: dt, distanceM: 0, speedMps: car.speedMps,
+        demand: 0, massRatio: 1, management: driver.tyreManagement ?? 0.75, pace: 'standard', trackC: config.weather === 'wet' ? 22 : 32, wet: config.weather === 'wet',
+      })
+      car.tyreLife = car.tyreState.life; car.tyreTemperatureC = car.tyreState.surfaceC
       if (car.status === 'pit-service') {
         const work = car.stopWork!
         const elapsed = work.totalSeconds - car.pitServiceRemaining
@@ -265,7 +271,8 @@ function advanceTick(previous: MotorsportRaceState, config: MotorsportRaceConfig
         if (car.pitServiceRemaining === 0) {
           const request = car.pitRequest!
           if (request.changeTyres) {
-            car.tyreLife = 1; car.tyreTemperatureC = 55
+            car.tyreLife = 1; car.tyreTemperatureC = config.weather === 'wet' ? 18 : 25
+            car.tyreState = initialRaceTyre(car.tyreTemperatureC)
             const needsAlternate = config.championship === 'indycar' && (config.course.kind === 'road' || config.course.kind === 'street' || config.course.id === 'nashville') && car.tyreSets.filter(set => set.compound === 'alternate' && set.completedLaps >= 2).length < (config.course.kind === 'street' || config.course.id === 'nashville' ? 2 : 1)
             car.tyreSets = [...car.tyreSets, { compound: config.weather === 'wet' ? 'wet' : needsAlternate ? 'alternate' : 'primary', completedLaps: 0 }]
           }
@@ -318,7 +325,7 @@ function advanceTick(previous: MotorsportRaceState, config: MotorsportRaceConfig
       car.activeDrivingEnd = state.raceSeconds
       const paceSkill = config.sessionKind === 'qualifying' ? driver.qualifyingPace ?? driver.racePace ?? 0.75 : driver.racePace ?? 0.75
       const tyreSkill = driver.tyreManagement ?? 0.75
-      const surfaceGrip = tyreGripScale(car, config.weather)
+      const surfaceGrip = tyreGripScale(car, config.weather, entry.classId, config.course.kind === 'short-oval' || config.course.kind === 'speedway')
       const mass = machine.massKg.value + machine.driverMassKg.value + car.fuelKg
       const ahead = nearestAhead.get(car.entryId)
       const aero = ahead ? trafficAero(ahead.gap, car.lateralM - ahead.car.lateralM, car.speedMps) : { dragScale: 1, liftScale: 1 }
@@ -419,10 +426,14 @@ function advanceTick(previous: MotorsportRaceState, config: MotorsportRaceConfig
       car.hybridRecoveredMj = (car.hybridRecoveredMj ?? 0) + acceptedRegeneration
       car.hybridEnergyMj = clamp(car.hybridEnergyMj + acceptedRegeneration - hybrid * dt / 1000, 0, machine.hybridCapacityMj.value)
       car.hybridDeployedMj += hybrid * dt / 1000
-      car.tyreLife = Math.max(0, car.tyreLife - distanceStep / 1000 / (80 + tyreSkill * 180) * (config.weather === 'wet' ? 0.7 : car.tyreSets.at(-1)?.compound === 'alternate' ? 1.4 : 1) * (car.paceMode === 'push' ? 1.2 : car.paceMode === 'save' ? 0.8 : 1))
       const tyreLoad = clamp((tyreForces.lateral + driveForce + brakeForce) / Math.max(1, tyreForces.available), 0, 1.5)
-      const temperatureTarget = car.speedMps < 5 ? 35 : (config.weather === 'wet' ? 55 : 72) + tyreLoad * 28
-      car.tyreTemperatureC += (temperatureTarget - car.tyreTemperatureC) * dt / 40
+      car.tyreState = advanceRaceTyre(car.tyreState ? { ...car.tyreState, life: car.tyreLife, surfaceC: car.tyreTemperatureC } : initialRaceTyre(car.tyreTemperatureC, car.tyreLife), {
+        category: entry.classId, compound: car.tyreSets.at(-1)?.compound ?? 'primary', oval: config.course.kind === 'short-oval' || config.course.kind === 'speedway',
+        seconds: dt, distanceM: distanceStep, speedMps: car.speedMps, demand: tyreLoad,
+        massRatio: mass / (machine.massKg.value + machine.driverMassKg.value + machine.fuelCapacityKg.value * 0.5),
+        management: tyreSkill, pace: car.paceMode ?? 'standard', trackC: config.weather === 'wet' ? 22 : 32, wet: config.weather === 'wet',
+      })
+      car.tyreLife = car.tyreState.life; car.tyreTemperatureC = car.tyreState.surfaceC
       const drivetrain = drivetrainState(machine, car.speedMps, car.gear)
       car.gear = drivetrain.gear; car.rpm = drivetrain.rpm
       if (car.status === 'running') car.telemetryHistory = recordTelemetry(car.telemetryHistory,{lap:Math.floor(car.distanceM/length),progress:modulo(car.distanceM,length)/length,seconds:state.raceSeconds,speedKph:car.speedMps*3.6,throttlePercent:car.throttlePercent ?? 0,brakePercent:car.brakePercent ?? 0,gear:car.gear,rpm:car.rpm})

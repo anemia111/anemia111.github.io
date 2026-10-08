@@ -1,14 +1,13 @@
 import { clamp } from './coursePhysics'
+import { initialRaceTyre, raceTyreGrip } from '../simulation/raceTyres'
 import type { MotorsportCar, MotorsportMachine, MotorsportRaceConfig } from './types'
 
 /** SIM tyre curve; individual supplier temperature/compound maps are private. */
-export function tyreGripScale(car: MotorsportCar, weather: MotorsportRaceConfig['weather']) {
+export function tyreGripScale(car: MotorsportCar, weather: MotorsportRaceConfig['weather'], classId: MotorsportMachine['classId'] = 'gt300', oval = false) {
   const compound = car.tyreSets.at(-1)?.compound ?? 'primary'
-  const optimum = compound === 'wet' ? 70 : 90
-  const temperature = clamp(1 - ((car.tyreTemperatureC - optimum) / 100) ** 2 * 0.35, 0.65, 1)
-  const wear = 0.82 + 0.18 * car.tyreLife
   const surface = weather === 'wet' ? compound === 'wet' ? 0.73 : 0.48 : compound === 'wet' ? 0.78 : 1
-  return temperature * wear * surface * (compound === 'alternate' ? 1.03 : 1)
+  const state = car.tyreState ? { ...car.tyreState, life: car.tyreLife, surfaceC: car.tyreTemperatureC } : initialRaceTyre(car.tyreTemperatureC, car.tyreLife)
+  return raceTyreGrip(state, classId, compound, oval) * surface
 }
 
 /** SIM wake coefficients, distinct from manufacturer or wind-tunnel data. */
