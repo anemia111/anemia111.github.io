@@ -28,6 +28,11 @@ try {
     await page.getByRole('button', { name: 'Pause simulation', exact: true }).click()
     const second = await page.locator('.sector-value b').allTextContents()
     assert.notDeepEqual(second, first)
+    const clipped = await page.locator('.sector-value b').evaluateAll(elements => elements.filter(element => {
+      const range = document.createRange(); range.selectNodeContents(element)
+      return range.getBoundingClientRect().width > element.getBoundingClientRect().width + 0.5
+    }).map(element => element.textContent))
+    assert.deepEqual(clipped, [], `${category}: sector text fits its column`)
     const screenshot = `live-sectors-${category}.png`
     await page.screenshot({ path: join(artifacts, screenshot), fullPage: true })
     reports.push({ category, first, second, coloredMiniSectors: colors, screenshot })
