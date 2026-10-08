@@ -1,3 +1,4 @@
+import { repairSafetyCarStartTiming } from '../simulation/startLapTiming'
 import { encodeTelemetryHistory, decodeTelemetryHistory } from '../simulation/telemetryHistory'
 import { createSfOtsSimulation } from '../simulation/sfOtsRuntime'
 import type {
@@ -1305,7 +1306,7 @@ function migrateRaceSnapshot(
     config.vehicleEraId,
   )
 
-  return {
+  return repairSafetyCarStartTiming({
     ...value,
     cars: value.cars.map((car) => {
       const persisted = car as CarSnapshot &
@@ -1353,7 +1354,7 @@ function migrateRaceSnapshot(
         trackLateralOffset: lateralOffsetM,
       }
     }),
-  }
+  }, config.track.lengthKm)
 }
 
 function isCompatibleRaceSnapshot(

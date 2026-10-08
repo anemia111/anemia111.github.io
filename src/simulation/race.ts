@@ -3732,6 +3732,12 @@ export function advanceRace(
       return {
         ...car,
         totalDistance: stagedDistance,
+        // The release-line crossing begins racing; it cannot complete a lap.
+        // SC formations retain their distance offset, so a fixed ledger of 1
+        // would record the tail of the queue as a one-second lap at green.
+        processedLap: raceStartTriggered
+          ? Math.max(car.processedLap, Math.ceil(stagedDistance - 1e-9))
+          : car.processedLap,
         lap: stagedLap,
         progress: clamp01(stagedDistance - stagedLap),
         brakePercent:
