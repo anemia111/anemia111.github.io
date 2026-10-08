@@ -23,6 +23,9 @@ try {
   const sessions=await page.getByLabel('Weekend session').locator('option').evaluateAll(options=>options.map(option=>option.value))
   assert.ok(sessions.includes('race'),`${event} has no decision race`)
   await page.getByLabel('Weekend session').selectOption('race')
+  // Wet SC starts/aborted starts legitimately subtract extra formation laps.
+  // This calendar test checks scheduled distance under a single dry formation.
+  await page.getByLabel('Seed',{exact:true}).fill('sf-calendar-dry-0')
   await page.waitForFunction(laps=>new RegExp(`\\d+\\s*/\\s*${laps}`).test(document.querySelector('.broadcast-session-core')?.textContent??''),laps).catch(async error=>{
    console.log(JSON.stringify({event,core:await page.locator('.broadcast-session-core').textContent(),selectedEvent:await page.getByLabel('Championship round').inputValue(),session:await page.getByLabel('Weekend session').inputValue(),errors}))
    throw error

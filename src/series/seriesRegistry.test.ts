@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { weatherFor } from '../simulation/weather'
+import { formationLapsPlannedFor } from '../simulation/race'
 import {
   historicalDriverPool2026,
   materializeAssignedDriver,
@@ -118,6 +120,10 @@ describe('Phase 1 series registry boundary', () => {
     const expected = [37, 37, 25, 31, 31, 41, 41, 51, 41, 41, 31, 31]
     const active = series.calendar.filter(event => !event.cancelled)
     expect(active).toHaveLength(12)
+    for (const track of series.tracks) {
+      expect(weatherFor('sf-calendar-dry-0', track, 0)).toBe('clear')
+      expect(formationLapsPlannedFor({ seed: 'sf-calendar-dry-0', track, drivers: series.drivers, teams: series.teams, seriesId: series.id })).toBe(1)
+    }
     for (const event of active) {
       const distance = resolveSuperFormulaEventOperations(series, event.id)!.raceDistance
       expect(distance.availability).toBe('verified-event-override')

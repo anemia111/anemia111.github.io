@@ -32,3 +32,6 @@ Regression checks cover exact event resolution and preserve unavailable
 unknown/cancelled event behavior. Browser coverage selects Race for each of
 the 12 active events, checks scheduled lap count, starts the engine, and
 requires race-clock progress without JavaScript errors. Existing UI is retained.
+The browser fixture uses a checked clear-weather seed with one formation lap.
+Random wet SC/aborted starts can legitimately reduce the displayed race distance
+by extra formation laps; those operational reductions are not missing calendar data.
