@@ -108,9 +108,25 @@ describe('Phase 1 series registry boundary', () => {
       value: null,
     })
     expect(unrelated.raceDistance).toMatchObject({
-      availability: 'unavailable',
-      value: null,
+      availability: 'verified-event-override',
+      value: { laps: 41, timeLimitSeconds: 4500 },
     })
+  })
+
+  it('supplies each active SF round with its own published championship race distance', () => {
+    const series = seriesPackageById.get('super-formula')!
+    const expected = [37, 37, 25, 31, 31, 41, 41, 51, 41, 41, 31, 31]
+    const active = series.calendar.filter(event => !event.cancelled)
+    expect(active).toHaveLength(12)
+    for (const event of active) {
+      const distance = resolveSuperFormulaEventOperations(series, event.id)!.raceDistance
+      expect(distance.availability).toBe('verified-event-override')
+      expect(distance.value?.laps).toBe(expected[event.round - 1])
+      expect(distance.value?.timeLimitSeconds).toBe(event.round === 3 ? 3000 : 4500)
+      expect(distance.provenance.url).toMatch(/^https:\/\/(superformula.net|www.suzukacircuit.jp|motorsports.jaf.or.jp)\//)
+    }
+    expect(resolveSuperFormulaEventOperations(series, 'sf-03-original')!.raceDistance.availability).toBe('unavailable')
+    expect(resolveSuperFormulaEventOperations(series, 'unknown-event')!.raceDistance.availability).toBe('unavailable')
   })
 
   it('rejects a legacy SUPER FORMULA generic operation if one is injected', () => {
