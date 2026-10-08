@@ -1,3 +1,4 @@
+import { advancePedals } from '../simulation/pedalControl'
 import { recordTelemetry } from '../simulation/telemetryHistory'
 import { clamp, modulo, MOTORSPORT_STEP_SECONDS, targetSpeedMps, stationAt, tyreForceBudget } from './coursePhysics'
 import { drivetrainState, trafficAero, tyreGripScale } from './vehicleDynamics'
@@ -324,12 +325,26 @@ function advanceTick(previous: MotorsportRaceState, config: MotorsportRaceConfig
       const tyreForces = tyreForceBudget(machine, station, car.speedMps, conditions)
       const rolling = 0.015 * mass * 9.80665
       const wheelPowerForce = powerKw * 1000 * 0.94 / Math.max(8, car.speedMps)
-      const desiredForce = mass * (target - car.speedMps) / dt + drag + rolling
+      // Feed forward the braking slope of the upcoming speed envelope. A finite
+      // response time avoids trying to erase every speed error in a single tick.
+      const previewM = Math.max(3, car.speedMps * 0.25)
+      const futureTarget = targetSpeedMps(config.course, machine, car.distanceM + previewM, conditions) * Math.min(1, (0.95 + paceSkill * 0.05) * paceFactor)
+      const plannedAcceleration = Math.min(0, (futureTarget ** 2 - target ** 2) / (2 * previewM))
+      const desiredForce = mass * (plannedAcceleration + (target - car.speedMps) / 0.55) + drag + rolling
       // Driven-axle shares are SIM; LMH front assist uses its deployment gate.
       const drivenShare = entry.classId === 'hypercar' && hybrid > 50 ? 1 : 0.62
-      const driveForce = Math.max(0, Math.min(desiredForce, wheelPowerForce, tyreForces.longitudinal * drivenShare))
-      const braking = tyreForces.longitudinal / mass
-      const brakeForce = Math.min(tyreForces.longitudinal, Math.max(0, -desiredForce))
+      // Pedal percentage refers to a fixed hydraulic capacity, not today's
+      // changing tyre load. Otherwise pressure falsely rises as aero load falls.
+      // Reference-speed hardware sizing is SIM pending supplier brake maps.
+      const brakeCapacity = machine.tyreMu.value * ((machine.massKg.value + machine.driverMassKg.value) * 9.80665 + 0.5 * 1.225 * machine.liftAreaM2.value * 85 ** 2)
+      const pedal = advancePedals({
+        throttle: Math.max(0, Math.min(desiredForce, tyreForces.longitudinal * drivenShare * 0.95)) / Math.max(1, wheelPowerForce) * 100,
+        brake: Math.max(0, -desiredForce) / Math.max(1, brakeCapacity) * 100,
+        previousThrottle: car.throttlePercent ?? 0, previousBrake: car.brakePercent ?? 0,
+        seconds: dt, carbonBrakes: entry.classId === 'hypercar' || entry.classId === 'lmp2' || entry.classId === 'indycar',
+      })
+      const driveForce = Math.min(wheelPowerForce * pedal.throttle / 100, tyreForces.longitudinal * drivenShare)
+      const brakeForce = Math.min(tyreForces.longitudinal, brakeCapacity * pedal.brake / 100)
       const acceleration = (driveForce - drag - rolling - brakeForce) / mass
       const throttleFraction = clamp(driveForce / Math.max(1, wheelPowerForce), 0, 1)
       hybrid *= throttleFraction
@@ -342,8 +357,8 @@ function advanceTick(previous: MotorsportRaceState, config: MotorsportRaceConfig
       const distanceStep = ahead && state.flag !== 'green'
         ? Math.min(unconstrainedStep, Math.max(0, ahead.gap + ahead.car.speedMps * dt - 6))
         : unconstrainedStep
-      car.throttlePercent = throttleFraction * 100
-      car.brakePercent = braking > 0 ? clamp(brakeForce / (mass * braking) * 100, 0, 100) : 0
+      car.throttlePercent = pedal.throttle
+      car.brakePercent = pedal.brake
       car.speedMps = nextSpeed; car.distanceM += distanceStep
       car.driverDistanceM[car.driverIndex] += distanceStep
       const fuelUsed = machine.fuelKgPerKm.value * distanceStep / 1000 * (acceleration < -1 ? 0.35 : 0.85 + 0.15 * Math.min(1, Math.max(0, acceleration) / 4)) * (entry.classId === 'hypercar' ? Math.max(0,(powerKw-hybrid)/powerKw) : 1) * (car.paceMode === 'save' ? 0.85 : car.paceMode === 'push' ? 1.05 : 1)

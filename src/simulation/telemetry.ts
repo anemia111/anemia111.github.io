@@ -1,3 +1,4 @@
+import { advancePedals } from './pedalControl'
 import { advanceSfOts } from './sfOtsRuntime'
 import type {
   ExecutableSeriesId,
@@ -548,7 +549,7 @@ export function calculateCarTelemetry(options: {
       (options.following?.decelerationMps2 ?? 0) /
         Math.max(1, categoryPhysics.maximumBrakeDecelerationMps2)) * 100 +
     pitLaneBrakeDemand
-  const brakePercent = Math.round(
+  const requestedBrakePercent = Math.round(
     clamp(
       phase?.flag === 'red' || immobilizedIncident
         ? 100
@@ -567,12 +568,14 @@ export function calculateCarTelemetry(options: {
           : car.speedKph < pitLaneSpeedLimitKph + 1
             ? 8
             : 0
-    : brakePercent > 3
+    : requestedBrakePercent > 3
       ? 0
       : dynamics.fullThrottle
         ? 100
-        : 34 + dynamics.straightness * 62 +
-          Math.max(0, targetSpeedKph - car.speedKph) * 0.24
+        : Number.isFinite(corneringSpeedLimitKph)
+          ? 100 * Math.sqrt(Math.max(0, 1 - Math.min(1, car.speedKph / Math.max(1, corneringSpeedLimitKph)) ** 4)) +
+            Math.max(0, targetSpeedKph - car.speedKph) * 0.24
+          : 100
   const controlThrottleScale = phase?.flag === 'red' ? 0 : phase ? 0.84 : 1
   const requestedThrottlePercent = Math.round(
     // A straight can have an unbounded target. Bound pedal demand before
@@ -607,9 +610,17 @@ export function calculateCarTelemetry(options: {
       100,
     ),
   )
-  const throttlePercent = timedTrafficYield
-    ? Math.min(38, behaviorManagedThrottlePercent)
-    : behaviorManagedThrottlePercent
+  const pedals = advancePedals({
+    throttle: timedTrafficYield ? Math.min(38, behaviorManagedThrottlePercent) : behaviorManagedThrottlePercent,
+    brake: requestedBrakePercent,
+    previousThrottle: car.throttlePercent,
+    previousBrake: car.brakePercent,
+    seconds: deltaSeconds,
+    carbonBrakes: categoryPhysics.id === 'f1-custom',
+    stop: phase?.flag === 'red' || immobilizedIncident,
+  })
+  const throttlePercent = car.pitPhase === 'box' ? 0 : pedals.throttle
+  const brakePercent = pedals.brake
   const otsAvailable =
     overtakeSystem === 'ots' &&
     otsRuntimeCanActivate &&

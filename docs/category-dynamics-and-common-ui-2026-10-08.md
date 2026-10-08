@@ -67,7 +67,7 @@ These changes correct physical mechanisms; they do not establish measured lap
 or corner-speed accuracy for every car and venue. A four-lap, full-fuel solo SIM
 probe is saved with the verification artifacts. It is not equivalent to an
 observed qualifying lap. As a reference, the official 2026 St Petersburg pole
-was 60.5426s, while the current default full-fuel solo race probe is about 75s.
+was 60.5426s, while the current default full-fuel solo race probe is about 79s.
 This discrepancy remains uncalibrated and must not be presented as a validated
 reproduction. Manufacturer BoP, tyre maps, racing-line geometry, track grip,
 elevation and some operational inputs still need event-level calibration.
@@ -76,3 +76,30 @@ Official comparison: [2026 St Petersburg qualifying](https://www.indycar.com/new
 The SIM label remains visible. At the user’s request, the source/assumption
 button and lengthy explanation table have been removed from the setup UI.
 Provenance remains in internal data, exported configurations and this audit.
+
+
+## Pedal controller correction
+
+Both native F1/SF and expansion physics now consume stateful pedal commands.
+Throttle pickup is limited to 200 percent/second, release to 1200; brake
+application to 650 for carbon-brake classes or 450 otherwise, release to 260.
+These rates are SIM parameters, not measured driver-specific pedal traces.
+Red flags and immobilized cars retain an immediate stop override.
+
+Expansion driving replaces one-tick speed-error correction with envelope-slope
+feedforward and a 0.55 s response. Requested throttle respects the driven-axle
+combined-grip budget, rather than reporting full pedal while silently clipping
+all the drive force. Brake percentage uses fixed hardware capacity sized at a
+SIM 85 m/s reference, so falling aerodynamic load does not by itself increase
+the displayed pressure. The same pedal commands drive force and telemetry;
+hybrid deployment and recovery continue to use delivered mechanical power.
+Native corner throttle now depends on lateral grip utilisation instead of an
+arbitrary 34 percent minimum. Existing native machine coefficients remain.
+
+Verification includes a complete flying lap for each of seven expansion
+classes, progressive throttle and brake release assertions, and 12 raw 10 Hz
+lap traces (Fuji, Okayama, Imola, Le Mans, St Petersburg, Indianapolis and native F1/SF Suzuka).
+Trace data and plots are captured from actual simulation ticks without a
+visual smoothing filter. These establish controller behaviour, not agreement
+with measured driver telemetry. Remaining geometry artefacts and event-level
+pace calibration must still be distinguished from real measured reproduction.

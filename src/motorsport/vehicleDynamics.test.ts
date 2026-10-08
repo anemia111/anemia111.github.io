@@ -7,6 +7,27 @@ import type { MotorsportClass } from './types'
 
 const classes: MotorsportClass[] = ['kyojo','gt500','gt300','hypercar','lmgt3','lmp2','indycar']
 describe('category-resolved driving physics', () => {
+  it.each(classes)('%s drives a complete flying lap with progressive pickup and brake release', classId => {
+    const category = classId === 'kyojo' ? 'kyojo' : classId === 'indycar' ? 'indycar' : classId === 'gt500' || classId === 'gt300' ? 'super-gt' : 'wec'
+    const config = createMotorsportConfig(category, classId === 'lmp2' ? 'wec:3' : undefined)
+    config.entries = [config.entries.find(entry => entry.classId === classId)!]
+    let state = { ...createMotorsportRace(config), phase: 'racing' as const }
+    let partialThrottle = 0, partialBrake = 0, samples = 0
+    for (let i = 0; i < 10000 && state.cars[0].distanceM < config.course.lengthM * 2; i++) {
+      const before = state.cars[0]
+      state = advanceMotorsportRace(state, 1, config) as typeof state
+      const car = state.cars[0]
+      if (before.distanceM < config.course.lengthM) continue
+      expect((car.throttlePercent ?? 0) - (before.throttlePercent ?? 0)).toBeLessThanOrEqual(20.00001)
+      expect((before.brakePercent ?? 0) - (car.brakePercent ?? 0)).toBeLessThanOrEqual(26.00001)
+      if ((car.throttlePercent ?? 0) > 5 && (car.throttlePercent ?? 0) < 95) partialThrottle++
+      if ((car.brakePercent ?? 0) > 3 && (car.brakePercent ?? 0) < 95) partialBrake++
+      samples++
+    }
+    expect(samples).toBeGreaterThan(300)
+    expect(partialThrottle).toBeGreaterThan(20)
+    expect(partialBrake).toBeGreaterThan(20)
+  })
   it.each(classes)('%s reserves a shared tyre budget for steering, traction and braking', classId => {
     const machine=motorsportMachine('test reference',classId)
     const conditions={massKg:machine.massKg.value+machine.driverMassKg.value+30,gripScale:1}

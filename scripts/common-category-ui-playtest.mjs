@@ -33,7 +33,7 @@ try {
    assert.equal(await builder.locator('.free-mode-search label').count(),2)
    for(const name of ['Add multiple','Category grid','Drivers','Cars','Equal cars','Clear','Reset'])assert.equal(await builder.locator('.free-mode-tools').getByRole('button',{name,exact:true}).count(),1,`${id} ${name}`)
    for(const name of ['Rename','Duplicate','Delete','Export JSON','Import JSON'])assert.equal(await builder.locator('.free-mode-presets').getByRole('button',{name,exact:true}).count(),1)
-   const freeStyle=await builder.evaluate(el=>{const style=x=>{const s=getComputedStyle(x);return [s.fontSize,s.height,s.color]};const panel=el.querySelector('.free-mode-builder');return {title:style(el.querySelector('h1')),field:style(el.querySelector('.free-mode-settings select')),row:style(el.querySelector('.free-mode-entry-row')),footerVisible:el.querySelector('.free-mode-footer').getBoundingClientRect().bottom<=innerHeight,scroll:document.documentElement.scrollWidth<=innerWidth}})
+   const freeStyle=await builder.evaluate(el=>{const style=x=>{const s=getComputedStyle(x);return [s.fontSize,s.height,s.color]};return {title:style(el.querySelector('h1')),field:style(el.querySelector('.free-mode-settings select')),row:style(el.querySelector('.free-mode-entry-row')),footerVisible:el.querySelector('.free-mode-footer').getBoundingClientRect().bottom<=innerHeight,scroll:document.documentElement.scrollWidth<=innerWidth}})
    if(!freeReference)freeReference=freeStyle
    assert.deepEqual(freeStyle,freeReference,`${id} Free Mode must match F1 dimensions`)
    await page.screenshot({path:join(artifacts,`common-free-${id.replace(':','-')}-${viewport.width}.png`)})
