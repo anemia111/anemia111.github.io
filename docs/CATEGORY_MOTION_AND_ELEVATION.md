@@ -29,6 +29,9 @@ correct XY-to-XZ normal sign) instead of forcing every marker onto the same
 line. Its continuous pit distance drives a smooth entry/exit blend, including
 service at the actual distance. It no longer inherits F1's unrelated garage
 slot position. Pit furniture uses category entry/exit and speed-limit markers.
+Practice/qualifying releases are spaced on the pit path and initialize road
+distance from that same path, so each car rejoins at the registered exit instead
+of inheriting a grid-relative distance at the control line.
 Only the existing engine's passing decisions are displayed; no cosmetic pass
 or position gain is generated.
 

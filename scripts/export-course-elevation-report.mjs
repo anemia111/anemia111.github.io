@@ -10,7 +10,12 @@ try {
   const {trackCornerTelemetry}=await server.ssrLoadModule('/src/data/cornerReferences.ts')
   const {courseElevationProfiles,elevationProfileFor,elevationAt}=await server.ssrLoadModule('/src/data/courseElevation.ts')
   const {cornerElevations}=await server.ssrLoadModule('/src/data/cornerElevations.ts')
+  const {seriesPackages}=await server.ssrLoadModule('/src/series/seriesRegistry.ts')
   const all=new Map([...tracks.map(t=>[t.id,{track:t,categories:['F1']}]),...supportSeriesTracks.map(t=>[t.id,{track:t,categories:['SF']}])])
+  for(const track of seriesPackages.find(p=>p.id==='super-formula').tracks){
+    const record=all.get(track.id)
+    if(record&&!record.categories.includes('SF'))record.categories.push('SF')
+  }
   for(const category of ['kyojo','super-gt','wec','indycar'])for(const course of motorsportCourses(category)){
     if(all.has(course.id))all.get(course.id).categories.push(category)
     else all.set(course.id,{track:dashboardCourse({...createMotorsportConfig(category),course}),categories:[category]})

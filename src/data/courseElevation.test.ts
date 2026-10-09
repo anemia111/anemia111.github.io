@@ -50,6 +50,10 @@ describe('road heights remain registered across every category',()=>{
   const values=curve.getSpacedPoints(192).map(p=>p.y)
   expect(Math.max(...values)-Math.min(...values)).toBeLessThan(1.1)
   expect(Math.max(...profile.elevationsM)-Math.min(...profile.elevationsM)).toBeGreaterThan(39)
+  const flat=createPresentationTrackCurve({...track,elevationDisplayScale:0})
+  const exaggerated=createPresentationTrackCurve({...track,elevationDisplayScale:3})
+  expect(flat.getPointAt(0.5).y).toBeCloseTo(0,8)
+  expect(exaggerated.getPointAt(0.5).y).toBeCloseTo(curve.getPointAt(0.5).y*3,8)
   expect(JSON.stringify(track)).toBe(before)
  })
  it('revalidates a cached point array when Free Mode changes the course id or distance',()=>{

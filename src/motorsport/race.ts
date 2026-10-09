@@ -67,8 +67,11 @@ export function createMotorsportRace(config: MotorsportRaceConfig): MotorsportRa
   if (timed) cars.forEach((car, index) => {
     // Independent SIM pit releases, spaced along the exit queue. The first
     // partial out lap is excluded from best-lap classification below.
-    car.distanceM = -index * 20
-    car.status = 'pit-exit'; car.pitPathM = config.course.pitLengthM.value * 0.5
+    const pitLength=config.course.pitLengthM.value
+    const releaseSpacing=Math.min(6,pitLength*0.7/Math.max(1,cars.length-1))
+    car.status = 'pit-exit'; car.pitPathM = pitLength*0.75-index*releaseSpacing
+    const pitArc=modulo(config.course.pitExit.value-config.course.pitEntry.value,1)
+    car.distanceM=modulo(config.course.pitEntry.value+car.pitPathM/pitLength*pitArc,1)*config.course.lengthM
     car.lapInvalid = true
     car.speedMps = config.course.pitSpeedKph.value / 3.6
   })
