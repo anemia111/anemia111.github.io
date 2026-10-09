@@ -16,7 +16,8 @@ try {
   for(const category of ['f1-custom','super-formula','motorsport:kyojo','motorsport:super-gt','motorsport:wec','motorsport:indycar']){
    await page.getByRole('combobox',{name:'Racing series',exact:true}).selectOption(category)
    await page.getByRole('button',{name:'Open setup',exact:true}).click()
-   const selector=page.getByRole('combobox',{name:category.startsWith('motorsport:')?'Motorsport event':'Championship round',exact:true})
+   await page.locator('.setup-panel').waitFor()
+   const selector=category.startsWith('motorsport:')?page.getByRole('combobox',{name:'Motorsport event',exact:true}):page.getByLabel('Championship round')
    await selector.waitFor()
    await selector.locator('option').first().waitFor({state:'attached'})
    const options=await selector.locator('option').evaluateAll(options=>options.filter(o=>!o.disabled&&o.value).map(o=>({value:o.value,label:o.label})))
