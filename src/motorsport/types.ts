@@ -54,6 +54,9 @@ export type MotorsportPitRequest = {
   entryId: string; fuelFraction: number; changeTyres: boolean; nextDriverIndex: number | null
 }
 export type MotorsportCar = {
+  battle?: { opponentId: string; side: -1 | 1; startedAt: number }
+  teamInstruction?: import('../simulation/teamDecision').TeamInstruction
+  driverIntent?: import('../simulation/driverDecision').DriverDecisionIntent
   tyreState?: import('../simulation/raceTyres').RaceTyreState
   telemetryHistory?: import('../simulation/telemetryHistory').TelemetryPoint[]
   throttlePercent?: number; brakePercent?: number; rpm?: number

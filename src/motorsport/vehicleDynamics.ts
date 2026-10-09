@@ -1,3 +1,4 @@
+import { wakeDownforceMultiplier, wakeDragReduction } from '../simulation/wakeModel'
 import { clamp } from './coursePhysics'
 import { initialRaceTyre, raceTyreGrip } from '../simulation/raceTyres'
 import type { MotorsportCar, MotorsportMachine, MotorsportRaceConfig } from './types'
@@ -11,10 +12,12 @@ export function tyreGripScale(car: MotorsportCar, weather: MotorsportRaceConfig[
 }
 
 /** SIM wake coefficients, distinct from manufacturer or wind-tunnel data. */
-export function trafficAero(gapM: number, lateralM: number, speedMps: number) {
-  const alignment = clamp(1 - Math.abs(lateralM) / 3, 0, 1)
-  const strength = gapM > 5 && gapM < 160 ? Math.exp(-(gapM - 5) / 45) * alignment * clamp(speedMps / 35, 0, 1) : 0
-  return { dragScale: 1 - 0.18 * strength, liftScale: 1 - 0.24 * strength }
+export function trafficAero(gapM: number, lateralM: number, speedMps: number, radiusM = 1200) {
+  const curvature = clamp(120 / Math.max(1,radiusM),0,1)
+  const observation = { gapSeconds: gapM / Math.max(1,speedMps), lateralSeparationM: lateralM,
+    curvature, straightness: 1-curvature }
+  return { dragScale: 1-wakeDragReduction(observation,0.063),
+    liftScale: wakeDownforceMultiplier(observation,0.9) }
 }
 
 /** Fixed ratio ladder, not corner-speed-dependent gear selection. */

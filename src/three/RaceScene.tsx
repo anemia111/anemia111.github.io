@@ -226,12 +226,12 @@ function InstancedPitBoxes({ boxes }: { boxes: PosedInstance[] }) {
 
     boxes.forEach(({ index, pose }, instanceIndex) => {
       const rotationY = Math.atan2(pose.tangent.x, pose.tangent.z)
-      object.position.copy(pose.position).setY(0.12)
+      object.position.copy(pose.position).add(new THREE.Vector3(0,0.12,0))
       object.rotation.set(0, rotationY, 0)
       object.updateMatrix()
       base.setMatrixAt(instanceIndex, object.matrix)
 
-      object.position.setY(0.2)
+      object.position.y += 0.08
       object.updateMatrix()
       marker.setMatrixAt(instanceIndex, object.matrix)
       marker.setColorAt(instanceIndex, index % 2 === 0 ? cyan : gold)
@@ -426,7 +426,7 @@ function PitLane({
         const progress = entry + (index / 29) * ((exit + 1 - entry) % 1)
         const pose = poseOnTrack(curve, progress % 1, pitLaneOffset(track))
 
-        return pose.position.setY(0.1)
+        return pose.position.clone().add(new THREE.Vector3(0,0.1,0))
       }),
     [curve, track],
   )
@@ -473,13 +473,13 @@ function PitLane({
       <SpriteLabel
         color="#4bd8ff"
         fontSize={0.54}
-        position={labelPose.position.setY(0.45)}
+        position={labelPose.position.clone().add(new THREE.Vector3(0,0.45,0))}
         text="PIT"
       />
       <SpriteLabel
         color="#f4c430"
         fontSize={0.42}
-        position={labelPose.position.clone().setY(0.86).add(new THREE.Vector3(0, 0, 0.62))}
+        position={labelPose.position.clone().add(new THREE.Vector3(0,0.86,0)).add(new THREE.Vector3(0, 0, 0.62))}
         text={`${track.pitLane?.speedLimitKph ?? 80} KPH`}
       />
     </group>
@@ -506,7 +506,7 @@ function ActiveAeroZoneLines({
             presentationTrackWidth(track) / 2 + 0.16,
           )
 
-          return pose.position.setY(0.14)
+          return pose.position.clone().add(new THREE.Vector3(0,0.14,0))
         })
         const labelPose = poseOnTrack(
           curve,
@@ -528,7 +528,7 @@ function ActiveAeroZoneLines({
             color="#46d880"
             fontSize={0.8}
             outlineColor="#03120a"
-            position={zone.labelPose.position.setY(0.54)}
+            position={zone.labelPose.position.clone().add(new THREE.Vector3(0,0.54,0))}
             text={zone.label}
           />
         </group>
@@ -575,7 +575,7 @@ function RaceControlLines({
       {markers.map((marker) => (
         <group
           key={`${marker.label}-${marker.progress}`}
-          position={marker.pose.position.setY(0.11)}
+          position={marker.pose.position.clone().add(new THREE.Vector3(0,0.11,0))}
           rotation={[0, Math.atan2(marker.pose.tangent.x, marker.pose.tangent.z), 0]}
         >
           <mesh>
@@ -638,7 +638,7 @@ function StartingGridSlots({
 
     slots.forEach(({ index, pose }, instanceIndex) => {
       const rotationY = Math.atan2(pose.tangent.x, pose.tangent.z)
-      object.position.copy(pose.position).setY(0.075)
+      object.position.copy(pose.position).add(new THREE.Vector3(0,0.075,0))
       object.rotation.set(0, rotationY, 0)
       object.updateMatrix()
       slotMesh.setMatrixAt(instanceIndex, object.matrix)
@@ -647,7 +647,7 @@ function StartingGridSlots({
       object.position
         .copy(pose.position)
         .add(pose.tangent.clone().multiplyScalar(-0.78))
-        .setY(0.093)
+        .add(new THREE.Vector3(0,0.093,0))
       object.updateMatrix()
       lineMesh.setMatrixAt(instanceIndex, object.matrix)
     })
@@ -697,7 +697,7 @@ function InstancedKerbs({ kerbs }: { kerbs: KerbInstance[] }) {
 
     kerbs.forEach(({ index, pose, side }, instanceIndex) => {
       const rotationY = Math.atan2(pose.tangent.x, pose.tangent.z)
-      object.position.copy(pose.position).setY(0.09)
+      object.position.copy(pose.position).add(new THREE.Vector3(0,0.09,0))
       object.rotation.set(0, rotationY, 0)
       object.scale.set(1, 1, 1)
       object.updateMatrix()
@@ -707,7 +707,7 @@ function InstancedKerbs({ kerbs }: { kerbs: KerbInstance[] }) {
       object.position
         .copy(pose.position)
         .add(pose.normal.clone().multiplyScalar(side * 0.38))
-        .setY(0.06)
+        .add(new THREE.Vector3(0,0.06,0))
       object.updateMatrix()
       runoffMesh.setMatrixAt(instanceIndex, object.matrix)
     })
@@ -750,12 +750,12 @@ function InstancedMarshalPosts({ posts }: { posts: [number, number, number][] })
     const cyan = new THREE.Color('#4bd8ff')
 
     posts.forEach((post, index) => {
-      object.position.set(post[0], 0.28, post[2])
+      object.position.set(post[0], post[1] + 0.28, post[2])
       object.rotation.set(0, 0, 0)
       object.updateMatrix()
       poleMesh.setMatrixAt(index, object.matrix)
 
-      object.position.setY(0.62)
+      object.position.y += 0.62
       object.updateMatrix()
       signMesh.setMatrixAt(index, object.matrix)
       signMesh.setColorAt(index, index % 3 === 0 ? gold : cyan)
@@ -813,8 +813,8 @@ function TrackFurniture({
     [curve, config.track],
   )
   const marshalPosts = useMemo(
-    () => (config.track.marshalPosts ?? []).filter((_, index) => index % 2 === 0),
-    [config.track.marshalPosts],
+    () => (config.track.marshalPosts ?? []).filter((_, index) => index % 2 === 0).map(point=>presentationPoint(config.track,point)),
+    [config.track],
   )
 
   return (
@@ -860,7 +860,7 @@ function SectorPathLinesContent({
       const points = Array.from({ length: 45 }, (_, pointIndex) => {
         const progress = (start + (pointIndex / 44) * span) % 1
 
-        return poseOnTrack(curve, progress, 0).position.setY(0.13)
+        return poseOnTrack(curve, progress, 0).position.add(new THREE.Vector3(0,0.13,0))
       })
       const labelProgress = (start + span * 0.5) % 1
       const labelPose = poseOnTrack(
@@ -885,7 +885,7 @@ function SectorPathLinesContent({
       const progress =
         (start + (pointIndex / (sampleCount - 1)) * span) % 1
 
-      return poseOnTrack(curve, progress, 0).position.setY(0.2)
+      return poseOnTrack(curve, progress, 0).position.add(new THREE.Vector3(0,0.2,0))
     })
     const labelProgress = (start + span * 0.48) % 1
     const labelPose = poseOnTrack(
@@ -924,7 +924,7 @@ function SectorPathLinesContent({
             <SpriteLabel
               color={color}
               fontSize={isControlled ? 0.94 : 0.84}
-              position={sector.labelPose.position.setY(0.56)}
+              position={sector.labelPose.position.clone().add(new THREE.Vector3(0,0.56,0))}
               text={
                 isControlled
                   ? `${sectorFlagLabels[flag]} ${track.sectorLabels?.[index] ?? `S${index + 1}`}`
@@ -945,14 +945,14 @@ function SectorPathLinesContent({
             color={yellowSeverity === 'double' ? '#ffae00' : '#ffe35a'}
             fontSize={yellowSeverity === 'double' ? 1 : 0.9}
             outlineColor="#071019"
-            position={localYellow.labelPose.position.setY(0.68)}
+            position={localYellow.labelPose.position.clone().add(new THREE.Vector3(0,0.68,0))}
             text={yellowSeverity === 'double' ? 'DOUBLE YELLOW' : 'SINGLE YELLOW'}
           />
           <SpriteLabel
             color="#ffffff"
             fontSize={0.72}
             outlineColor="#b9162e"
-            position={localYellow.incidentPose.position.setY(0.62)}
+            position={localYellow.incidentPose.position.clone().add(new THREE.Vector3(0,0.62,0))}
             text="INCIDENT"
           />
         </group>
@@ -1118,7 +1118,7 @@ function CarMarker({
       snapshotElapsedSeconds,
     )
 
-    return pose.position.setY(0.54)
+    return pose.position.clone().add(new THREE.Vector3(0,0.54,0))
   }, [
     car,
     curve,
@@ -1250,7 +1250,7 @@ function SafetyCarMarker({
       )
     }
 
-    return pose.position.setY(0.5)
+    return pose.position.clone().add(new THREE.Vector3(0,0.5,0))
   }, [curve, elapsedSeconds, leader.progress, procedure, track])
 
   useEffect(() => () => markerTexture.dispose(), [markerTexture])
@@ -1334,7 +1334,7 @@ function OpenF1CarOverlay({
 
       const pose = poseOnTrack(curve, progressAtTime(car, windowTimeMs), 0)
 
-      group.position.copy(pose.position.setY(0.46))
+      group.position.copy(pose.position.clone().add(new THREE.Vector3(0,0.46,0)))
       group.lookAt(group.position.clone().add(pose.tangent))
     }
 
@@ -1346,7 +1346,7 @@ function OpenF1CarOverlay({
       <SpriteLabel
         color="#4bd8ff"
         fontSize={0.5}
-        position={tagPose.position.setY(0.72)}
+        position={tagPose.position.clone().add(new THREE.Vector3(0,0.72,0))}
         text={`OpenF1 ${mode}`}
       />
       {overlay.cars.map((car) => (
@@ -1448,12 +1448,12 @@ function CameraRig({
     return {
       position: new THREE.Vector3(
         overviewFrame.center.x,
-        cameraHeight,
-        overviewFrame.center.z + 0.01,
+        overviewFrame.center.y + cameraHeight,
+        overviewFrame.center.z + cameraHeight * 0.48,
       ),
       target: new THREE.Vector3(
         overviewFrame.center.x,
-        0,
+        overviewFrame.center.y,
         overviewFrame.center.z,
       ),
     }
@@ -1466,7 +1466,7 @@ function CameraRig({
     const canvas = gl.domElement
     canvas.tabIndex = 0
     canvas.setAttribute('aria-label', 'Interactive circuit map')
-    canvas.title = 'Wheel: zoom · Drag: rotate · Right drag: pan · Double-click: reset · Keys: + / −, ← / →, Home'
+    canvas.title = 'Wheel: zoom · Drag: rotate · Right drag: pan · Double-click: reset · Keys: + / −, ← / →: rotate, ↑ / ↓: tilt, Home'
     const reset = () => {
       if (cameraMode !== 'overview') return
       userControlled.current = false
@@ -1475,13 +1475,18 @@ function CameraRig({
     const keydown = (event: KeyboardEvent) => {
       if (cameraMode !== 'overview' || !controlsRef.current) return
       if (event.key === 'Home') { event.preventDefault(); reset(); return }
-      if (!['+', '=', '-', 'ArrowLeft', 'ArrowRight'].includes(event.key)) return
+      if (!['+', '=', '-', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return
       event.preventDefault()
       userControlled.current = true
       const controls = controlsRef.current
       const offset = camera.position.clone().sub(controls.target)
       if (event.key === '+' || event.key === '=') offset.multiplyScalar(0.8)
       else if (event.key === '-') offset.multiplyScalar(1.25)
+      else if (event.key==='ArrowUp' || event.key==='ArrowDown') {
+        const spherical=new THREE.Spherical().setFromVector3(offset)
+        spherical.phi=THREE.MathUtils.clamp(spherical.phi+(event.key==='ArrowUp'?-1:1)*Math.PI/24,0.08,Math.PI*0.47)
+        offset.setFromSpherical(spherical)
+      }
       else offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), event.key === 'ArrowLeft' ? Math.PI / 12 : -Math.PI / 12)
       camera.position.copy(controls.target).add(offset)
       controls.update()
@@ -1510,7 +1515,7 @@ function CameraRig({
       selectedGarageBayIndex,
       snapshotElapsedSeconds,
     )
-    const target = pose.position.setY(0.5)
+    const target = pose.position.clone().add(new THREE.Vector3(0,0.5,0))
 
     return {
       chasePosition: target
@@ -1538,7 +1543,7 @@ function CameraRig({
       targetRef.current.lerp(overviewCamera.target, 0.08)
       // A nearly vertical lookAt with Y-up can roll with tiny horizontal
       // interpolation errors. Lock the overview frame to world X / -Z.
-      camera.rotation.set(-Math.PI / 2, 0, 0)
+      camera.lookAt(targetRef.current)
       controlsRef.current?.target.copy(targetRef.current)
 
       if (

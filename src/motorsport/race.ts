@@ -1,3 +1,6 @@
+import { decideDriverBehavior, type DriverDecisionContext } from '../simulation/driverDecision'
+import { decideTeamInstruction, applyTeamInstruction, delayTeammatePit } from '../simulation/teamDecision'
+import { behaviorDriverFor } from './driverBehavior'
 import { advancePedals } from '../simulation/pedalControl'
 import { advanceRaceTyre, initialRaceTyre } from '../simulation/raceTyres'
 import { recordTelemetry } from '../simulation/telemetryHistory'
@@ -177,7 +180,7 @@ export function setMotorsportFlag(state: MotorsportRaceState, flag: MotorsportRa
 }
 
 /** Passing prepares a physically close train for the actual faster car. */
-function yieldingCars(state: MotorsportRaceState, config: MotorsportRaceConfig, physicalOrder: MotorsportCar[], freeSpeeds: Map<string, number>): Set<string> {
+function yieldingCars(state: MotorsportRaceState, config: MotorsportRaceConfig, physicalOrder: MotorsportCar[]): Set<string> {
   const yielding = new Set<string>()
   if (state.flag !== 'green' || config.championship === 'indycar') return yielding
   const length = config.course.lengthM
@@ -191,9 +194,11 @@ function yieldingCars(state: MotorsportRaceState, config: MotorsportRaceConfig, 
       const car = physicalOrder[(index + offset) % physicalOrder.length]
       const gap = modulo(car.distanceM - overtaker.distanceM, length)
       if (gap > reach) break
-      if (gap <= 0 || (overtaker.speedMps <= car.speedMps + 2 &&
-        (freeSpeeds.get(overtaker.entryId) ?? overtaker.speedMps) <= (freeSpeeds.get(car.entryId) ?? car.speedMps) + 2) ||
-        (overtaker.distanceM - car.distanceM < length * 0.8 && classFor.get(overtaker.entryId) === classFor.get(car.entryId))) continue
+      const rank: Record<string,number>={hypercar:4,lmp2:3,gt500:3,gt300:1,lmgt3:1,kyojo:1,indycar:2}
+      const ownClass=classFor.get(overtaker.entryId)!, aheadClass=classFor.get(car.entryId)!
+      const fasterClass=rank[ownClass]>rank[aheadClass]
+      const lappingSameClass=ownClass===aheadClass && overtaker.distanceM-car.distanceM>=length*0.8
+      if (gap<=0 || (!fasterClass && !lappingSameClass)) continue
       if (tail < 0 ? gap <= Math.max(70, overtaker.speedMps * 1.5) : gap - tail < 55) {
         yielding.add(car.entryId); tail = gap
       }
@@ -221,21 +226,22 @@ function advanceTick(previous: MotorsportRaceState, config: MotorsportRaceConfig
   const entries = new Map(config.entries.map(entry => [entry.id, entry]))
   const physicalOrder = previous.cars.filter(car => car.status === 'running')
     .sort((a, b) => modulo(a.distanceM, length) - modulo(b.distanceM, length) || a.entryId.localeCompare(b.entryId))
-  // Free-running capability survives matching the speed of the car ahead.
-  // Using only current speed makes a blocked car lose its passing intention.
-  const freeSpeeds = new Map(physicalOrder.map(car => {
-    const entry = entries.get(car.entryId)!
-    return [car.entryId, targetSpeedMps(config.course, entry.machine, car.distanceM, {
-      massKg: entry.machine.massKg.value + entry.machine.driverMassKg.value + car.fuelKg,
-      gripScale: tyreGripScale(car, config.weather, entries.get(car.entryId)!.classId, config.course.kind === 'short-oval' || config.course.kind === 'speedway'),
-    })] as const
-  }))
-  const yields = yieldingCars(previous, config, physicalOrder, freeSpeeds)
+  const yields = yieldingCars(previous, config, physicalOrder)
   const nearestAhead = new Map<string, { car: MotorsportCar; gap: number }>()
   if (physicalOrder.length > 1) physicalOrder.forEach((car, index) => {
     const next = physicalOrder[(index + 1) % physicalOrder.length]
     nearestAhead.set(car.entryId, { car: next, gap: modulo(next.distanceM - car.distanceM, length) })
   })
+  const nearestBehind = new Map<string, { car: MotorsportCar; gap: number }>()
+  if (physicalOrder.length>1) physicalOrder.forEach((car,index)=>{
+    const behind=physicalOrder[(index+physicalOrder.length-1)%physicalOrder.length]
+    nearestBehind.set(car.entryId,{car:behind,gap:modulo(car.distanceM-behind.distanceM,length)})
+  })
+  const teamObservations=physicalOrder.map(car=>({id:car.entryId,teamId:entries.get(car.entryId)!.team,
+    classId:entries.get(car.entryId)!.classId,distanceM:car.distanceM,speedMps:car.speedMps,running:true,
+    expectedLapSeconds:car.bestLapSeconds??car.lastLapSeconds,tyreLife:car.tyreLife}))
+  const reservedPitTeams=new Set(previous.cars.filter(car=>car.status==='pit-entry'||car.status==='pit-service')
+    .map(car=>entries.get(car.entryId)!.team))
   const leadLapBefore = Math.max(...previous.cars.map(car => car.laps))
   const crossings: { entryId: string; time: number; laps: number }[] = []
   state.cars = previous.cars.map(old => {
@@ -319,7 +325,14 @@ function advanceTick(previous: MotorsportRaceState, config: MotorsportRaceConfig
         }
       }
     } else {
-      car.pitRequest ??= requestForStrategy(config, entry, car)
+      if (!car.pitRequest) {
+        const planned=requestForStrategy(config,entry,car)
+        const fuelLaps=car.fuelKg/Math.max(0.001,machine.fuelKgPerKm.value*length/1000)
+        const delay=delayTeammatePit({teammateBusy:reservedPitTeams.has(entry.team),fuelLaps,tyreLife:car.tyreLife,
+          mandatoryStopDue:planned?.nextDriverIndex!==null && planned?.nextDriverIndex!==undefined,
+          weatherEmergency:config.weather==='wet' && car.tyreSets.at(-1)?.compound!=='wet'})
+        if (planned && !delay) {car.pitRequest=planned;reservedPitTeams.add(entry.team)}
+      }
       car.driverSeconds[car.driverIndex] += dt; car.stintSeconds += dt
       if (car.activeDrivingStart === null) car.activeDrivingStart = previous.raceSeconds
       car.activeDrivingEnd = state.raceSeconds
@@ -327,38 +340,71 @@ function advanceTick(previous: MotorsportRaceState, config: MotorsportRaceConfig
       const tyreSkill = driver.tyreManagement ?? 0.75
       const surfaceGrip = tyreGripScale(car, config.weather, entry.classId, config.course.kind === 'short-oval' || config.course.kind === 'speedway')
       const mass = machine.massKg.value + machine.driverMassKg.value + car.fuelKg
-      const ahead = nearestAhead.get(car.entryId)
-      const aero = ahead ? trafficAero(ahead.gap, car.lateralM - ahead.car.lateralM, car.speedMps) : { dragScale: 1, liftScale: 1 }
-      const conditions = { massKg: mass, gripScale: surfaceGrip, ...aero }
-      const paceFactor = car.paceMode === 'push' ? 1.015 : car.paceMode === 'save' ? 0.96 : car.paceMode === 'defend' ? 0.99 : 1
-      let target = targetSpeedMps(config.course, machine, car.distanceM, conditions) * Math.min(1,(0.95 + paceSkill * 0.05) * paceFactor)
+      const ahead = nearestAhead.get(car.entryId), behind=nearestBehind.get(car.entryId)
+      const station = stationAt(config.course,car.distanceM)
+      const aero = ahead ? trafficAero(ahead.gap,car.lateralM-ahead.car.lateralM,car.speedMps,station.radiusM) : {dragScale:1,liftScale:1}
+      const conditions = {massKg:mass,gripScale:surfaceGrip,...aero}
+      const paceFactor = car.paceMode==='push'?1.015:car.paceMode==='save'?0.96:car.paceMode==='defend'?0.99:1
+      const skillFactor=Math.min(1,(0.95+paceSkill*0.05)*paceFactor)
+      const freeTarget=targetSpeedMps(config.course,machine,car.distanceM,{massKg:mass,gripScale:surfaceGrip})*skillFactor
+      let target=targetSpeedMps(config.course,machine,car.distanceM,conditions)*skillFactor
       if (car.pitRequest) {
-        const pitDistance = modulo(config.course.pitEntry.value * length - car.distanceM, length)
-        const availableBraking = tyreForceBudget(machine, stationAt(config.course, car.distanceM), car.speedMps, conditions).longitudinal / mass
-        target = Math.min(target, Math.sqrt((config.course.pitSpeedKph.value / 3.6) ** 2 + 2 * availableBraking * pitDistance * 0.8))
+        const pitDistance=modulo(config.course.pitEntry.value*length-car.distanceM,length)
+        const braking=tyreForceBudget(machine,station,car.speedMps,conditions).longitudinal/mass
+        target=Math.min(target,Math.sqrt((config.course.pitSpeedKph.value/3.6)**2+2*braking*pitDistance*0.8))
       }
-      if (state.flag === 'fcy') target = Math.min(target, 80 / 3.6)
-      if (state.flag === 'yellow') target *= 0.7
-      if (state.flag === 'sc') target = Math.min(target, 100 / 3.6)
-      car.blueFlag = yields.has(car.entryId)
-      const aheadEntry = ahead ? entries.get(ahead.car.entryId)! : null
-      const accelerationAdvantage = aheadEntry && ahead
-        ? machine.powerKw.value * 1000 / (mass * Math.max(10, car.speedMps)) -
-          aheadEntry.machine.powerKw.value * 1000 / ((aheadEntry.machine.massKg.value + aheadEntry.machine.driverMassKg.value + ahead.car.fuelKg) * Math.max(10, ahead.car.speedMps))
-        : 0
-      const overtaking = ahead && !car.blueFlag && state.flag === 'green' && ahead.gap < Math.max(90, car.speedMps * 3) &&
-        (car.speedMps > ahead.car.speedMps + 0.5 ||
-          (target > ahead.car.speedMps + 0.75 &&
-            ((freeSpeeds.get(car.entryId) ?? target) > (freeSpeeds.get(ahead.car.entryId) ?? ahead.car.speedMps) + 0.75 || accelerationAdvantage > 0.3)) ||
-          car.distanceM - ahead.car.distanceM >= length * 0.8)
-      // Slower traffic holds a predictable line; the faster car finds space.
-      // Keep a committed passing side while alongside, and avoid choosing
-      // the same side as a car ahead that is itself already passing.
-      const passingSide = Math.abs(car.lateralM) >= 1 ? Math.sign(car.lateralM) : ahead && ahead.car.lateralM < -0.8 ? 1 : -1
-      const desiredLateral = car.blueFlag ? car.lateralM : overtaking ? passingSide * Math.min(2.2, config.course.widthM.value / 2 - 1.5) : 0
-      car.lateralM += clamp(desiredLateral - car.lateralM, -2.5 * dt, 2.5 * dt)
-      if (ahead && (state.flag !== 'green' || Math.abs(car.lateralM - ahead.car.lateralM) < 2.1)) {
-        if (ahead.gap < Math.max(7, car.speedMps * 0.5)) target = Math.min(target, Math.max(0, ahead.car.speedMps + (ahead.gap - 7) * 0.5))
+      if (state.flag==='fcy') target=Math.min(target,80/3.6)
+      if (state.flag==='yellow') target*=0.7
+      if (state.flag==='sc') target=Math.min(target,100/3.6)
+      car.blueFlag=yields.has(car.entryId)
+      const previousOpponent=car.battle?previous.cars.find(other=>other.entryId===car.battle!.opponentId):undefined
+      if (car.battle) {
+        const gap=previousOpponent?modulo(previousOpponent.distanceM-car.distanceM+length/2,length)-length/2:Infinity
+        if (!previousOpponent || previousOpponent.status!=='running' || gap < -7 || gap>140 || state.flag!=='green' || car.blueFlag) delete car.battle
+      }
+      const opponent=car.battle?previousOpponent:ahead?.car
+      const opponentEntry=opponent?entries.get(opponent.entryId)!:null
+      const gap=opponent?modulo(opponent.distanceM-car.distanceM+length/2,length)-length/2:Infinity
+      // The driver sees speed, public lap times and vehicle identity, not an
+      // opponent's hidden fuel/tyre state or its perfect future speed envelope.
+      const hasPaceCase=!opponent || car.bestLapSeconds===null || opponent.bestLapSeconds===null ||
+        car.bestLapSeconds<=opponent.bestLapSeconds+0.25 ||
+        (car.tyreSets.at(-1)?.completedLaps??0)+4<(opponent.tyreSets.at(-1)?.completedLaps??0)
+      const publicAccelerationAdvantage=opponentEntry?machine.powerKw.value/(machine.massKg.value+machine.driverMassKg.value)-
+        opponentEntry.machine.powerKw.value/(opponentEntry.machine.massKg.value+opponentEntry.machine.driverMassKg.value):0
+      const candidate=Boolean(opponent && !car.blueFlag && state.flag==='green' && gap<Math.max(90,car.speedMps*3) && hasPaceCase &&
+        (car.battle || car.speedMps>opponent.speedMps+0.5 ||
+          (freeTarget>opponent.speedMps+0.75 && publicAccelerationAdvantage>0.003) || car.distanceM-opponent.distanceM>=length*0.8))
+      const ownObservation=teamObservations.find(other=>other.id===car.entryId)!
+      const instruction=decideTeamInstruction(ownObservation,teamObservations.filter(other=>other.teamId===entry.team),length)
+      car.teamInstruction=instruction
+      let context: DriverDecisionContext = {
+        seed:config.seed,driver:behaviorDriverFor(driver),lap:Math.max(0,Math.floor(car.distanceM/length)),
+        trackProgress:modulo(car.distanceM,length)/length,
+        flagState:state.flag==='green'?'clear' as const:state.flag==='fcy'?'vsc' as const:state.flag,
+        currentLateralOffsetM:car.lateralM,physicalReferenceLineOffsetM:0,trackHalfWidthM:config.course.widthM.value/2,edgeClearanceM:1.5,
+        attack:opponent?{active:candidate,opponentId:opponent.entryId,opponentLateralOffsetM:opponent.lateralM,
+          gapSeconds:Math.max(0,gap)/Math.max(5,car.speedMps),intensity:1}:undefined,
+        dirtyAir:ahead?{active:ahead.gap/Math.max(5,car.speedMps)<2.5 && station.radiusM<500,
+          opponentId:ahead.car.entryId,opponentLateralOffsetM:ahead.car.lateralM,intensity:0.5}:undefined,
+        tow:ahead?{active:ahead.gap/Math.max(5,car.speedMps)<1.8 && station.radiusM>500,
+          opponentId:ahead.car.entryId,opponentLateralOffsetM:ahead.car.lateralM,intensity:0.5}:undefined,
+        yield:car.blueFlag?{active:true,preferredSide:1 as const,approachingLateralOffsetM:-2.2,requiredSeparationM:2.25}:undefined,
+      }
+      if (config.sessionKind!=='practice' && config.sessionKind!=='qualifying') context=applyTeamInstruction(context,instruction,
+        behind?{id:behind.car.entryId,gapSeconds:behind.gap/Math.max(5,behind.car.speedMps),lateralM:behind.car.lateralM}:undefined)
+      const decision=decideDriverBehavior(context)
+      car.driverIntent=decision.intent
+      const overtaking=decision.intent==='attack' && candidate
+      if (overtaking && !car.battle && opponent) car.battle={opponentId:opponent.entryId,
+        side:Math.abs(car.lateralM)>=1?(car.lateralM<0?-1:1):opponent.lateralM< -0.8?1:-1,startedAt:state.raceSeconds}
+      const desiredLateral=car.battle&&overtaking?car.battle.side*Math.min(2.4,config.course.widthM.value/2-1.5):decision.desiredLateralOffsetM
+      car.lateralM+=clamp(desiredLateral-car.lateralM,-2.5*dt,2.5*dt)
+      if (ahead && (state.flag!=='green' || Math.abs(car.lateralM-ahead.car.lateralM)<2.1)) {
+        const closing=Math.max(0,car.speedMps-ahead.car.speedMps)
+        const braking=tyreForceBudget(machine,station,car.speedMps,conditions).longitudinal/mass
+        const brakingGap=7+closing*0.5+closing**2/Math.max(1,2*braking*0.8)
+        if (ahead.gap<Math.max(brakingGap,car.speedMps*0.7)) target=Math.min(target,Math.max(0,ahead.car.speedMps+(ahead.gap-7)*0.5))
       }
       const drag = 0.5 * 1.225 * machine.dragAreaM2.value * aero.dragScale * car.speedMps ** 2
       let powerKw = machine.powerKw.value
@@ -369,16 +415,16 @@ function advanceTick(previous: MotorsportRaceState, config: MotorsportRaceConfig
       const p2p = overtaking && state.flag === 'green' && target > car.speedMps && car.pushToPassSeconds > 0 && entry.classId === 'indycar' && (config.course.kind === 'road' || config.course.kind === 'street')
         ? 44.74 * Math.min(1, car.pushToPassSeconds / dt) : 0
       powerKw += p2p
-      const station = stationAt(config.course, car.distanceM)
       const tyreForces = tyreForceBudget(machine, station, car.speedMps, conditions)
       const rolling = 0.015 * mass * 9.80665
+      const slopeForce=mass*9.80665*station.grade/Math.sqrt(1+station.grade**2)
       const wheelPowerForce = powerKw * 1000 * 0.94 / Math.max(8, car.speedMps)
       // Feed forward the braking slope of the upcoming speed envelope. A finite
       // response time avoids trying to erase every speed error in a single tick.
       const previewM = Math.max(3, car.speedMps * 0.25)
       const futureTarget = targetSpeedMps(config.course, machine, car.distanceM + previewM, conditions) * Math.min(1, (0.95 + paceSkill * 0.05) * paceFactor)
       const plannedAcceleration = Math.min(0, (futureTarget ** 2 - target ** 2) / (2 * previewM))
-      const desiredForce = mass * (plannedAcceleration + (target - car.speedMps) / 0.55) + drag + rolling
+      const desiredForce = mass * (plannedAcceleration + (target - car.speedMps) / 0.55) + drag + rolling + slopeForce
       // Driven-axle shares are SIM; LMH front assist uses its deployment gate.
       const drivenShare = entry.classId === 'hypercar' && hybrid > 50 ? 1 : 0.62
       // Pedal percentage refers to a fixed hydraulic capacity, not today's
@@ -386,14 +432,14 @@ function advanceTick(previous: MotorsportRaceState, config: MotorsportRaceConfig
       // Reference-speed hardware sizing is SIM pending supplier brake maps.
       const brakeCapacity = machine.tyreMu.value * ((machine.massKg.value + machine.driverMassKg.value) * 9.80665 + 0.5 * 1.225 * machine.liftAreaM2.value * 85 ** 2)
       const pedal = advancePedals({
-        throttle: Math.max(0, Math.min(desiredForce, tyreForces.longitudinal * drivenShare * 0.95)) / Math.max(1, wheelPowerForce) * 100,
-        brake: Math.max(0, -desiredForce) / Math.max(1, brakeCapacity) * 100,
+        throttle: Math.max(0, Math.min(desiredForce, tyreForces.longitudinal * drivenShare * 0.95)) / Math.max(1, wheelPowerForce) * 100 * decision.throttleOpeningScale,
+        brake: Math.max(0, -desiredForce) / Math.max(1, brakeCapacity) * 100 * decision.brakePressureScale,
         previousThrottle: car.throttlePercent ?? 0, previousBrake: car.brakePercent ?? 0,
         seconds: dt, carbonBrakes: entry.classId === 'hypercar' || entry.classId === 'lmp2' || entry.classId === 'indycar',
       })
       const driveForce = Math.min(wheelPowerForce * pedal.throttle / 100, tyreForces.longitudinal * drivenShare)
       const brakeForce = Math.min(tyreForces.longitudinal, brakeCapacity * pedal.brake / 100)
-      const acceleration = (driveForce - drag - rolling - brakeForce) / mass
+      const acceleration = (driveForce - drag - rolling - slopeForce - brakeForce) / mass
       const throttleFraction = clamp(driveForce / Math.max(1, wheelPowerForce), 0, 1)
       hybrid *= throttleFraction
       car.hybridPowerKw = hybrid
@@ -411,7 +457,7 @@ function advanceTick(previous: MotorsportRaceState, config: MotorsportRaceConfig
       car.driverDistanceM[car.driverIndex] += distanceStep
       const fuelUsed = machine.fuelKgPerKm.value * distanceStep / 1000 * (acceleration < -1 ? 0.35 : 0.85 + 0.15 * Math.min(1, Math.max(0, acceleration) / 4)) * (entry.classId === 'hypercar' ? Math.max(0,(powerKw-hybrid)/powerKw) : 1) * (car.paceMode === 'save' ? 0.85 : car.paceMode === 'push' ? 1.05 : 1)
       car.fuelKg = Math.max(0, car.fuelKg - fuelUsed)
-      const deliveredPowerKw = Math.max(0, (mass * acceleration + drag + 0.015 * mass * 9.80665) * car.speedMps / 1000)
+      const deliveredPowerKw = Math.max(0, driveForce * car.speedMps / 1000)
       if (car.virtualEnergyMj !== null) {
         const beforeEnergy = car.virtualEnergyMj
         car.virtualEnergyMj -= deliveredPowerKw * dt / 1000

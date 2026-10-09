@@ -42,6 +42,8 @@ describe('traffic after matching the speed of a slower class',()=>{
  const base=queued('super-gt')
  const config={...base.config,entries:base.config.entries.map(entry=>({...entry,classId:base.config.entries[0].classId,machine:base.config.entries[0].machine}))}
  const state={...base.state,cars:base.state.cars.map(car=>({...car,fuelKg:base.state.cars[0].fuelKg}))}
- expect(advanceMotorsportRace(state,1,config).cars.every(car=>car.lateralM===0)).toBe(true)
+ const next=advanceMotorsportRace(state,1,config)
+ expect(next.cars.every(car=>car.driverIntent!=='attack' && car.battle===undefined)).toBe(true)
+ expect(next.cars.map(car=>car.entryId)).toEqual(state.cars.map(car=>car.entryId))
  })
 })

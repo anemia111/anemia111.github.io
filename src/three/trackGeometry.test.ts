@@ -15,15 +15,15 @@ describe('track geometry poses', () => {
       const raw = createTrackCurve(track), display = createPresentationTrackCurve(track)
       const tangent = display.getTangentAt(0)
       expect(Math.abs(tangent.z), track.id).toBeLessThan(1e-7)
-      expect(tangent.x, track.id).toBeGreaterThan(0.999)
+      expect(tangent.x, track.id).toBeGreaterThan(0.98)
       expect(display.getLength(), track.id).toBeCloseTo(raw.getLength(), 8)
       for (const progress of [0, ...track.sectorMarks, 0.5, 0.999]) {
-        expect(display.getPointAt(progress).distanceTo(display.getPointAt(0)), track.id).toBeCloseTo(raw.getPointAt(progress).distanceTo(raw.getPointAt(0)), 8)
+        expect(display.getPointAt(progress).setY(0).distanceTo(display.getPointAt(0).setY(0)), track.id).toBeCloseTo(raw.getPointAt(progress).distanceTo(raw.getPointAt(0)), 8)
       }
       for (const point of track.centerline.filter((_,i)=>i%40===0)) {
         const transformed = new THREE.Vector3(...presentationPoint(track,point))
-        expect(transformed.distanceTo(display.points[track.centerline.indexOf(point)])).toBeLessThan(1e-10)
-        expect(transformed.distanceTo(new THREE.Vector3(...presentationPoint(track,track.centerline[0])))).toBeCloseTo(new THREE.Vector3(...point).distanceTo(new THREE.Vector3(...track.centerline[0])),8)
+        expect(transformed.setY(0).distanceTo(display.points[track.centerline.indexOf(point)].clone().setY(0))).toBeLessThan(1e-10)
+        expect(transformed.distanceTo(new THREE.Vector3(...presentationPoint(track,track.centerline[0])).setY(0))).toBeCloseTo(new THREE.Vector3(...point).distanceTo(new THREE.Vector3(...track.centerline[0])),8)
       }
       expect(JSON.stringify(track.centerline)).toBe(source)
     }

@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "generate:tracks": "node scripts/generate-real-track-layouts.mjs",
     "generate:support-tracks": "node scripts/generate-support-track-layouts.mjs",
+    "generate:course-elevations": "node scripts/export-elevation-targets.mjs && python scripts/generate-course-elevations.py",
     "generate:road-profiles": "node scripts/generate-measured-road-profiles.mjs",
     "update:pace-calibration": "node scripts/update-pace-calibration.mjs",
     "validate:series-scope": "node scripts/generate-phase1-series-audit.mjs --enforce",

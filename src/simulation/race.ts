@@ -1,3 +1,4 @@
+import { decideTeamInstruction, applyTeamInstruction } from './teamDecision'
 import { phaseOneConfig } from '../data/phaseOne'
 import { advanceRaceTyre } from './raceTyres'
 import { superFormulaSimulatedTyreFor } from './superFormulaLiveTires'
@@ -5069,6 +5070,11 @@ export function advanceRace(
       )
     : new Map<string, CarSnapshot>()
 
+  const teamObservations = frameCars.map(car => ({id:car.driverId,teamId:car.teamId,classId:'native',
+    distanceM:car.totalDistance*lapLengthM,speedMps:car.speedKph/3.6,running:car.status==='running',
+    expectedLapSeconds:car.bestLapTimeSeconds??car.lastLapTimeSeconds,
+    tyreLife:car.runtimeSystems.kind==='super-formula'?superFormulaSimulatedTyreFor(car.runtimeSystems.liveTires,config.track.lengthKm).life:1-(f1RuntimeFor(car)?.tires.tireWearPercent??0)/100}))
+  const ownTeamObservationById=new Map(teamObservations.map(car=>[car.id,car]))
   for (const car of frameCars) {
     if (car.status !== 'running') {
       continue
@@ -5183,7 +5189,7 @@ export function advanceRace(
     const yieldingTo = !localControlPhase
       ? blueFlagTrainApproaches.get(car.driverId)
       : undefined
-    const decisionContext: DriverDecisionContext = {
+    let decisionContext: DriverDecisionContext = {
       seed: config.seed,
       driver,
       lap: Math.max(0, Math.floor(car.totalDistance)),
@@ -5275,6 +5281,12 @@ export function advanceRace(
               ),
             }
           : undefined,
+    }
+    if (isRaceDistance) {
+      const own=ownTeamObservationById.get(car.driverId)!
+      const instruction=decideTeamInstruction(own,teamObservations.filter(other=>other.teamId===own.teamId),lapLengthM)
+      decisionContext=applyTeamInstruction(decisionContext,instruction,behindCar?{
+        id:behindCar.driverId,gapSeconds:gapBehindSeconds,lateralM:behindCar.lateralOffsetM}:undefined)
     }
     const observationInbox =
       car.driverObservationInbox ??

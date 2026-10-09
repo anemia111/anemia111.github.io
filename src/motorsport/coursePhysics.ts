@@ -1,8 +1,10 @@
+import { elevationProfileFor, elevationAt } from '../data/courseElevation'
+import { remainingEllipseForceN } from '../simulation/tyreForces'
 import type { MotorsportCourse, MotorsportMachine } from './types'
 
 export const MOTORSPORT_STEP_SECONDS = 0.1
 const SAMPLE_COUNT = 512
-export type CourseStation = { x: number; y: number; nx: number; ny: number; radiusM: number; bankingRadians: number }
+export type CourseStation = { x: number; y: number; nx: number; ny: number; radiusM: number; bankingRadians: number; grade: number; elevationM: number }
 const stationCache = new WeakMap<MotorsportCourse, CourseStation[]>()
 const envelopeCache = new WeakMap<MotorsportCourse, WeakMap<MotorsportMachine, Map<string, number[]>>>()
 export const modulo = (value: number, divisor: number) => ((value % divisor) + divisor) % divisor
@@ -12,6 +14,7 @@ export function courseStations(course: MotorsportCourse): CourseStation[] {
   const cached = stationCache.get(course)
   if (cached) return cached
   const points = course.points
+  const elevation=elevationProfileFor(course.id,points,course.lengthM)
   const lengths = points.map((point, i) => Math.hypot(point[0] - points[(i + 1) % points.length][0], point[1] - points[(i + 1) % points.length][1]))
   const total = lengths.reduce((sum, length) => sum + length, 0)
   if (!(total > 0) || !Number.isFinite(total) || !(course.lengthM > 0)) throw new Error('Course requires finite connected geometry and positive official distance')
@@ -37,7 +40,8 @@ export function courseStations(course: MotorsportCourse): CourseStation[] {
     const twiceArea = Math.abs((x - before[0]) * (after[1] - before[1]) - (y - before[1]) * (after[0] - before[0])) * scaleToMetres ** 2
     const radiusM = twiceArea < 0.01 ? 100_000 : clamp(a * b * c / (2 * twiceArea), 8, 100_000)
     const dx = after[0] - before[0], dy = after[1] - before[1], norm = Math.max(0.001, Math.hypot(dx, dy))
-    return { x, y, nx: -dy / norm / scaleToMetres, ny: dx / norm / scaleToMetres, radiusM,
+    const road=elevation?elevationAt(elevation,index/SAMPLE_COUNT):{grade:0,elevationM:0}
+    return { ...road, x, y, nx: -dy / norm / scaleToMetres, ny: dx / norm / scaleToMetres, radiusM,
       bankingRadians: radiusM < 1000 ? course.bankingDegrees.value * Math.PI / 180 : 0 }
   })
   stationCache.set(course, stations)
@@ -54,7 +58,7 @@ export function tyreForceBudget(machine: MotorsportMachine, station: CourseStati
   const load = mass * gravity * Math.cos(station.bankingRadians) + 0.5 * 1.225 * machine.liftAreaM2.value * liftScale * speed ** 2
   const available = machine.tyreMu.value * gripScale * load
   const lateral = Math.max(0, mass * speed ** 2 / station.radiusM - mass * gravity * Math.sin(station.bankingRadians))
-  return { available, lateral, longitudinal: Math.sqrt(Math.max(0, available ** 2 - lateral ** 2)) }
+  return { available, lateral, longitudinal: remainingEllipseForceN({availableForceN: available, usedForceN: lateral}) }
 }
 
 export function stationAt(course: MotorsportCourse, distanceM: number) {
@@ -92,7 +96,7 @@ export function speedEnvelope(course: MotorsportCourse, machine: MotorsportMachi
     // force law is used here and during integration, including bank support.
     speeds[current] *= index >= SAMPLE_COUNT ? 0.975 : 1
     const forces = tyreForceBudget(machine, courseStations(course)[current], speeds[current], { massKg: mass, gripScale: grip, liftScale })
-    const deceleration = Math.max(0.5, Math.min(35, forces.longitudinal / mass))
+    const deceleration = Math.max(0.5, Math.min(35, forces.longitudinal / mass + 9.80665 * courseStations(course)[current].grade))
     speeds[current] = Math.min(speeds[current], Math.sqrt(speeds[next] ** 2 + 2 * deceleration * ds))
   }
   if (variants.size >= 64) variants.delete(variants.keys().next().value!)

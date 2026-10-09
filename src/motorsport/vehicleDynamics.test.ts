@@ -31,7 +31,7 @@ describe('category-resolved driving physics', () => {
   it.each(classes)('%s reserves a shared tyre budget for steering, traction and braking', classId => {
     const machine=motorsportMachine('test reference',classId)
     const conditions={massKg:machine.massKg.value+machine.driverMassKg.value+30,gripScale:1}
-    const straight={x:0,y:0,nx:0,ny:1,radiusM:100000,bankingRadians:0}
+    const straight={x:0,y:0,nx:0,ny:1,radiusM:100000,bankingRadians:0,grade:0,elevationM:0}
     const turn={...straight,radiusM:80}
     const a=tyreForceBudget(machine,straight,25,conditions), b=tyreForceBudget(machine,turn,25,conditions)
     expect(b.longitudinal).toBeLessThan(a.longitudinal)
