@@ -1,3 +1,5 @@
+import { registeredCourseCorners } from '../data/cornerReferences'
+import type { TrackDefinition } from '../types'
 import specsJson from '../data/expansionMachineSpecs2026.json'
 import layoutsJson from '../data/expansionCourseLayouts.json'
 import { tracks } from '../data/tracks'
@@ -64,6 +66,7 @@ export type ExpansionCourseAsset = {
   id: string
   name: string
   centerline: Array<[number, number]>
+  corners?: TrackDefinition['corners']
   publishedLengthMeters: number | null
   measuredLengthMeters: number | null
   sourceUrl: string | null
@@ -84,14 +87,14 @@ export function courseAssetsFor(categoryId: string): ExpansionCourseAsset[] {
   return [...unique].map(([id, event]) => {
     const existing = existingTracks.get(existingTrackIds[id])
     if (existing) return {
-      id, name: event.trackName, centerline: existing.centerline.map(([x, , z]) => [x, -z]),
+      id, name: event.trackName, corners: existing.corners?.map(corner => ({...corner, position: [corner.position[0], 0, -corner.position[2]]})), centerline: existing.centerline.map(([x, , z]) => [x, -z]),
       publishedLengthMeters: existing.lengthKm * 1000, measuredLengthMeters: null,
       sourceUrl: existing.layoutSource?.url ?? null, geometryStatus: 'existing-pack' as const,
       notes: '既存のコース形状。追加カテゴリーでの計測線・ピット運用・車両ペースは別途検証。',
     }
     const layout = newLayouts.get(id)
     if (layout) return {
-      id, name: event.trackName, centerline: alignExpansionControlLine(id, layout.centerlineMeters as Array<[number, number]>),
+      id, name: event.trackName, corners: registeredCourseCorners(id), centerline: alignExpansionControlLine(id, layout.centerlineMeters as Array<[number, number]>),
       publishedLengthMeters: layout.publishedLengthMeters, measuredLengthMeters: layout.measuredLengthMeters,
       sourceUrl: layout.geometrySourceUrl, geometryStatus: 'geometryBasis' in layout && layout.geometryBasis === 'official-map-trace' ? 'official-map-trace' as const : 'osm-centerline' as const, notes: layout.notes,
     }

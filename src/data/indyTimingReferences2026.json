@@ -108,10 +108,10 @@
         "SECTOR 3"
       ],
       "controlPoint": [
-        -13.309,
-        -12.995
+        -13.308709,
+        -12.994699
       ],
-      "reverse": false,
+      "reverse": true,
       "sourceUrl": "https://www.imscdn.com/INDYCAR/Documents/5528/6745/indycar-topsectiontimes-race.pdf",
       "registrationBasis": "derived registration against official 2026 timing map on public centerline; not surveyed coordinates",
       "declaredLapMiles": 2.3,
@@ -168,10 +168,10 @@
         "SECTOR 3"
       ],
       "controlPoint": [
-        -101.715,
-        -602.953
+        -100.596153,
+        -700.720606
       ],
-      "reverse": false,
+      "reverse": true,
       "sourceUrl": "https://www.imscdn.com/INDYCAR/Documents/5527/6744/indycar-topsectiontimes-race.pdf",
       "registrationBasis": "derived registration against official 2026 timing map on public centerline; not surveyed coordinates",
       "declaredLapMiles": 2.439,
@@ -325,10 +325,10 @@
         "SECTOR 3"
       ],
       "controlPoint": [
-        -555.049,
-        109.317
+        -317.059474,
+        -46.132052
       ],
-      "reverse": false,
+      "reverse": true,
       "sourceUrl": "https://www.imscdn.com/INDYCAR/Documents/5523/6740/indycar-topsectiontimes-race.pdf",
       "registrationBasis": "derived registration against official 2026 timing map on public centerline; not surveyed coordinates",
       "declaredLapMiles": 2.258,

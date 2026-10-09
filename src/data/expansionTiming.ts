@@ -24,9 +24,9 @@ export const expansionTimingReferences: Record<string, ExpansionTimingReference>
   okayama: { year: 2025, lengthM: 3703, cumulativeM: [0, 962, 2520],
     sourceUrl: 'https://www.okayama-international-circuit.jp/guide/pdf/course.pdf',
     // Registration of the control line on the operator's course diagram.
-    controlPoint: [-83.133, -287.006] },
+    reverse: true, controlPoint: [-494.971752, -620.923134] },
   imola: { lengthM: 4909, cumulativeM: [0, 1214, 2728],
-    sourceUrl: wec('01_IMOLA', '1_Circuit%20Map.pdf'), controlPoint: [-260.598, 334.119] },
+    sourceUrl: wec('01_IMOLA', '1_Circuit%20Map.pdf'), controlPoint: [-201.61676, 331.367596] },
   spa: { lengthM: 7003.9, cumulativeM: [0, 2243.5, 5112.7],
     sourceUrl: wec('02_SPA%20FRANCORCHAMPS') },
   'le-mans': { lengthM: 13625.7, cumulativeM: [0, 1900.7, 7672.13],

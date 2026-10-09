@@ -3,7 +3,7 @@ import { CompoundUsageChart } from '../components/CompoundUsageChart'
 import { BarChart3, X } from 'lucide-react'
 import { MotorsportClassificationPanel } from './MotorsportClassificationPanel'
 import { TelemetryComparison } from '../components/TelemetryComparison'
-import { courseStations } from './coursePhysics'
+import { trackCornerTelemetry } from '../data/cornerReferences'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { lazy, Suspense } from 'react'
 import { BroadcastDashboard } from '../components/BroadcastDashboard'
@@ -59,15 +59,7 @@ export function MotorsportApp({ onBack, initialChampionship = 'kyojo', initialFr
   const debt = useRef(0)
   const standings = useMemo(() => motorsportStandings(state, config), [state, config])
   const selected = standings.find(row => row.entry.id === selectedId) ?? standings[0]
-  const telemetryCorners = useMemo(() => {
-    const stations = courseStations(config.course)
-    const candidates = stations.map((station,index)=>({radius:station.radiusM,progress:index/stations.length,index}))
-      .filter(point=>point.radius<250 && point.radius<=stations[(point.index+stations.length-1)%stations.length].radiusM && point.radius<stations[(point.index+1)%stations.length].radiusM)
-      .sort((a,b)=>a.radius-b.radius)
-    const chosen: typeof candidates = []
-    for (const point of candidates) if(chosen.every(other=>Math.min(Math.abs(point.progress-other.progress),1-Math.abs(point.progress-other.progress))>=0.025)) chosen.push(point)
-    return chosen.sort((a,b)=>a.progress-b.progress).map((point,index)=>({label:`C${index+1}`,progress:point.progress}))
-  },[config.course])
+  const telemetryCorners = useMemo(() => trackCornerTelemetry(dashboardCourse(config)), [config])
   const events = useMemo(() => motorsportEvents(config.championship), [config.championship])
   const courses = useMemo(() => motorsportCourses(config.championship), [config.championship])
 

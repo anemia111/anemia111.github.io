@@ -1,6 +1,6 @@
 import { CompoundUsageChart } from './CompoundUsageChart'
 import { TelemetryComparison } from './TelemetryComparison'
-import { profileDistanceKmBetween } from '../simulation/trackDynamics'
+import { trackCornerTelemetry } from '../data/cornerReferences'
 import {
   Activity,
   Database,
@@ -675,11 +675,7 @@ export function BroadcastDashboard({
   const [leaderboardMode, setLeaderboardMode] = useState<'live' | 'gap'>('live')
   const [showLiveTiming, setShowLiveTiming] = useState(true)
   const classIds = categoryPresentation ? ['gt500','gt300','hypercar','lmp2','lmgt3','kyojo','indycar'].filter(id => timingRows.some(row => row.categoryDisplay?.classId === id)) : []
-  const telemetryCorners = useMemo(() => categoryPresentation?.telemetryCorners ?? (track.corners ?? []).map(corner=>{
-    let nearest=0, distance=Infinity
-    track.centerline.forEach((point,index)=>{const value=Math.hypot(point[0]-corner.position[0],point[2]-corner.position[2]);if(value<distance){distance=value;nearest=index}})
-    return {label:`T${corner.number}`,progress:profileDistanceKmBetween(track,0,nearest/track.centerline.length)/track.lengthKm}
-  }),[categoryPresentation?.telemetryCorners,track])
+  const telemetryCorners = useMemo(() => categoryPresentation?.telemetryCorners ?? trackCornerTelemetry(track), [categoryPresentation?.telemetryCorners, track])
 
   useEffect(() => {
     if (dataMode !== 'SIM' && cameraMode !== 'overview') {

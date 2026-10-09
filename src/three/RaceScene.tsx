@@ -30,6 +30,7 @@ import {
 } from '../services/openF1Location'
 import {
   createPresentationTrackCurve,
+  presentationPoint,
   createTrackRibbonGeometry,
   edgePoints,
   poseOnTrack,
@@ -822,7 +823,7 @@ function TrackFurniture({
       <Line points={barrierRight} color="#7a8389" lineWidth={1.2} />
       <InstancedKerbs kerbs={kerbs} />
       {(config.track.corners ?? []).map((corner) => (
-        <group key={corner.number} position={[corner.position[0], 0.62, corner.position[2]]}>
+        <group key={corner.label ?? corner.number} position={presentationPoint(config.track, [corner.position[0], 0.62, corner.position[2]])}>
           <mesh position={[0, -0.2, 0]}>
             <cylinderGeometry args={[0.16, 0.16, 0.32, 12]} />
             <meshStandardMaterial color="#f4c430" roughness={0.55} />
@@ -832,7 +833,7 @@ function TrackFurniture({
             fontSize={0.42}
             outlineColor="#f4c430"
             position={[0, 0, 0]}
-            text={`${corner.number}`}
+            text={`${corner.label ?? corner.number}`}
           />
         </group>
       ))}
@@ -1023,10 +1024,10 @@ function TrackSurface({
           <SpriteLabel
             color="#dce7f2"
             fontSize={0.92}
-            key={corner.number}
+            key={corner.label ?? corner.number}
             outlineColor="#071019"
-            position={[corner.position[0], 0.46, corner.position[2]]}
-            text={`${corner.number}`}
+            position={presentationPoint(config.track, [corner.position[0], 0.46, corner.position[2]])}
+            text={`${corner.label ?? corner.number}`}
           />
         ))
       ) : (

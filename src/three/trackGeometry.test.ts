@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import * as THREE from 'three'
-import { createTrackCurve, createPresentationTrackCurve, poseOnTrack } from './trackGeometry'
+import { createTrackCurve, createPresentationTrackCurve, presentationPoint, poseOnTrack } from './trackGeometry'
 import { tracks } from '../data/tracks'
 import { seriesPackageById } from '../series/seriesRegistry'
 import { createMotorsportConfig, motorsportChampionships, motorsportCourses } from '../motorsport/packages'
@@ -19,6 +19,11 @@ describe('track geometry poses', () => {
       expect(display.getLength(), track.id).toBeCloseTo(raw.getLength(), 8)
       for (const progress of [0, ...track.sectorMarks, 0.5, 0.999]) {
         expect(display.getPointAt(progress).distanceTo(display.getPointAt(0)), track.id).toBeCloseTo(raw.getPointAt(progress).distanceTo(raw.getPointAt(0)), 8)
+      }
+      for (const point of track.centerline.filter((_,i)=>i%40===0)) {
+        const transformed = new THREE.Vector3(...presentationPoint(track,point))
+        expect(transformed.distanceTo(display.points[track.centerline.indexOf(point)])).toBeLessThan(1e-10)
+        expect(transformed.distanceTo(new THREE.Vector3(...presentationPoint(track,track.centerline[0])))).toBeCloseTo(new THREE.Vector3(...point).distanceTo(new THREE.Vector3(...track.centerline[0])),8)
       }
       expect(JSON.stringify(track.centerline)).toBe(source)
     }

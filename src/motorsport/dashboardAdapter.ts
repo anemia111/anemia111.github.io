@@ -1,3 +1,5 @@
+import { courseAssetsFor } from '../series/expansionAssets'
+import { projectPointToArcProgress } from '../data/sectorBoundaries'
 import { phaseOneConfig } from '../data/phaseOne'
 import { expansionCourseTiming } from '../data/expansionTiming'
 import { createInitialRace } from '../simulation/race'
@@ -16,9 +18,15 @@ export function dashboardCourse(config: MotorsportRaceConfig): TrackDefinition {
   const xs = points.map(p => p[0]), ys = points.map(p => p[1])
   const cx = (Math.max(...xs) + Math.min(...xs)) / 2, cy = (Math.max(...ys) + Math.min(...ys)) / 2
   const scale = 48 / Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys))
-  return { id: config.course.id, name: config.course.name, location: config.course.name,
+  const anchors = courseAssetsFor(config.championship === 'super-gt' ? 'super-gt-gt500' : config.championship === 'wec' ? 'wec-hypercar' : config.championship).find(course => course.id === config.course.id)?.corners ?? []
+  const corners = anchors.map(corner => {
+    const progress = projectPointToArcProgress(config.course.points.map(([x,y]) => [x,0,y]), corner.position)
+    const [x,y] = coursePosition(config.course, progress * config.course.lengthM)
+    return {...corner, position: [(x-cx)*scale,0,-(y-cy)*scale] as [number,number,number]}
+  })
+  return { corners, id: config.course.id, name: config.course.name, location: config.course.name,
     kind: config.course.kind === 'street' ? 'street' : 'permanent', feature: config.course.geometryBasis,
-    isSprintWeekend: false, rainProbability: 0, centerline: points.map(([x,y]) => [(x-cx)*scale,0,(y-cy)*scale]),
+    isSprintWeekend: false, rainProbability: 0, centerline: points.map(([x,y]) => [(x-cx)*scale,0,-(y-cy)*scale]),
     width: 4, lengthKm: config.course.lengthM / 1000, lengthSource: 'official', baseLapTime: 100,
     ...expansionCourseTiming(config.course.id, config.course.points), activeAeroUnavailable: true,
     layoutSource: { detail: 'real', provider: 'fallback', label: config.course.geometryBasis, url: config.course.sourceUrl, year: 2026 } }

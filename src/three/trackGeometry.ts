@@ -1,6 +1,22 @@
 import * as THREE from 'three'
 import type { TrackDefinition } from '../types'
 
+const presentationAngles = new WeakMap<TrackDefinition, number>()
+function presentationAngle(track: TrackDefinition) {
+  let angle = presentationAngles.get(track)
+  if (angle === undefined) {
+    const tangent = createTrackCurve(track).getTangentAt(0)
+    angle = Math.atan2(tangent.z, tangent.x)
+    presentationAngles.set(track, angle)
+  }
+  return angle
+}
+
+/** Furniture must undergo the same rigid rotation as the rendered road. */
+export function presentationPoint(track: TrackDefinition, point: [number, number, number]): [number, number, number] {
+  return new THREE.Vector3(...point).applyAxisAngle(new THREE.Vector3(0,1,0),presentationAngle(track)).toArray()
+}
+
 export function createTrackCurve(track: TrackDefinition) {
   return new THREE.CatmullRomCurve3(
     track.centerline.map((point) => new THREE.Vector3(...point)),
@@ -13,8 +29,7 @@ export function createTrackCurve(track: TrackDefinition) {
 /** Rotate the display alone: the control-line tangent runs left to right. */
 export function createPresentationTrackCurve(track: TrackDefinition) {
   const curve = createTrackCurve(track)
-  const tangent = curve.getTangentAt(0)
-  const angle = Math.atan2(tangent.z, tangent.x)
+  const angle = presentationAngle(track)
   const axis = new THREE.Vector3(0, 1, 0)
   for (const point of curve.points) point.applyAxisAngle(axis, angle)
   curve.updateArcLengths()

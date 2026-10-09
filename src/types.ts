@@ -923,6 +923,7 @@ export type TrackDefinition = {
     sourceUrl?: string | null
   }
   corners?: Array<{
+    label?: string
     number: number
     position: Vector3Tuple
   }>
