@@ -477,3 +477,13 @@ MADRING official anchors, Baku exclusion, display height controls and category
 road/pit/lateral interpolation. The existing WEC/GT/INDY/KYOJO category engine
 owns all motion; its actual lanes and continuous pit distance now reach the
 map. `scripts/course-elevation-playtest.mjs` is included in the publish gate.
+# Full-suite qualifying assertion follow-up
+
+The dry qualifying ERS test failed identically on baseline 0461fd4: attack peak
+340km/h vs preparation peak340.41km/h. Both phases can reach the physical speed
+ceiling, so a strict peak-speed comparison does not establish ERS deployment.
+The test now compares the minimum battery level between attack and preparation,
+alongside the existing harvest/deploy, battery depletion and full run-cycle
+assertions. The isolated regression and lint pass. Runtime physics is unchanged.
+The normal full publish gate must be rerun after this test correction.
+
