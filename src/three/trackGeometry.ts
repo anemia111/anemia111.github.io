@@ -39,7 +39,7 @@ function displayElevationFor(track: TrackDefinition) {
 }
 function relativeRoadHeight(track:TrackDefinition,profile:NonNullable<ReturnType<typeof elevationProfileFor>>,progress:number) {
   const planarLength=createTrackCurve(track).getLength()
-  return (elevationAt(profile,progress).elevationM-Math.min(...profile.elevationsM))*planarLength/(track.lengthKm*1000)
+  return (elevationAt(profile,progress).elevationM-Math.min(...profile.elevationsM))*planarLength/(track.lengthKm*1000)*(track.elevationDisplayScale??1)
 }
 /** Display-only height: domain geometry, sector distances and planar stationing
  * remain unchanged. Sampling uses the original planar arc progress exactly. */
@@ -68,7 +68,7 @@ export function createPresentationTrackCurve(track: TrackDefinition) {
   flat.updateArcLengths()
   const profile=displayElevationFor(track)
   if (!profile) return flat
-  const scale=flat.getLength()/(track.lengthKm*1000),datum=Math.min(...profile.elevationsM)
+  const scale=flat.getLength()/(track.lengthKm*1000)*(track.elevationDisplayScale??1),datum=Math.min(...profile.elevationsM)
   return new ElevatedPresentationCurve(flat,p=>(elevationAt(profile,p).elevationM-datum)*scale)
 }
 

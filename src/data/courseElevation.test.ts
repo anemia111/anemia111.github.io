@@ -7,6 +7,16 @@ import {dashboardCourse} from '../motorsport/dashboardAdapter'
 import {createPresentationTrackCurve,edgePoints,poseOnTrack} from '../three/trackGeometry'
 
 describe('road heights remain registered across every category',()=>{
+ it('pins Madrid to published road elevations and rejects the suspect Baku T20 cliff',()=>{
+  const madrid=tracks.find(t=>t.id==='madrid-approx')!,profile=courseElevationProfiles[madrid.id]
+  expect(profile.anchors?.map(a=>a[1])).toContain(671)
+  expect(profile.anchors?.map(a=>a[1])).toContain(697)
+  for(const [p,h] of profile.anchors!)expect(elevationAt(profile,p).elevationM).toBeCloseTo(h,8)
+  expect(profile.sourceUrl).toBe('https://www.madring.com/en/circuit')
+  const baku=courseElevationProfiles['baku-approx']
+  expect(Math.max(...baku.elevationsM)).toBeLessThan(0)
+  expect(baku.basis).toContain('unverified')
+ })
  it('covers all selectable layouts with finite, closed elevation and grade',()=>{
   const native=[...tracks,...supportSeriesTracks]
   const extra=['kyojo','super-gt','wec','indycar'] as const

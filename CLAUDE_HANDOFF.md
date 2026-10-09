@@ -468,3 +468,12 @@ the latest decision record, and retains `legacy-direct` as rollback. Local
 yellow order is explicitly enforced while passable obstructions remain
 exempt. No known implementation phase remains open; the numbered limits above
 are source/discretion/bundle boundaries, not hidden completion claims.
+
+## 2026-10-09 all-category elevation and motion follow-up
+
+Work from the deployed category branch, not outdated master. See
+`docs/CATEGORY_MOTION_AND_ELEVATION.md` for the 58-layout elevation ledger,
+MADRING official anchors, Baku exclusion, display height controls and category
+road/pit/lateral interpolation. The existing WEC/GT/INDY/KYOJO category engine
+owns all motion; its actual lanes and continuous pit distance now reach the
+map. `scripts/course-elevation-playtest.mjs` is included in the publish gate.
