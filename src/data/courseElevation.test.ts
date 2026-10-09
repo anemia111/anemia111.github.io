@@ -42,6 +42,13 @@ describe('road heights remain registered across every category',()=>{
   expect(Math.max(...profile.elevationsM)-Math.min(...profile.elevationsM)).toBeGreaterThan(39)
   expect(JSON.stringify(track)).toBe(before)
  })
+ it('revalidates a cached point array when Free Mode changes the course id or distance',()=>{
+  const profile=courseElevationProfiles['fuji'],points=profile.planarPoints
+  expect(elevationProfileFor('fuji',points,profile.lengthM)).not.toBeNull()
+  expect(elevationProfileFor('fuji',points,profile.lengthM*2)).toBeNull()
+  expect(elevationProfileFor('unregistered-custom',points,profile.lengthM)).toBeNull()
+  expect(elevationProfileFor('fuji',points,profile.lengthM)).not.toBeNull()
+ })
  it('does not attach a named course profile to arbitrary Free Mode geometry',()=>{
   expect(elevationProfileFor('suzuka-approx',[[0,0],[1000,0],[1000,1000],[0,1000]],5807)).toBeNull()
  })

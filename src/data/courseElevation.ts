@@ -4,12 +4,12 @@ export type CourseElevationProfile = {
   planarPoints: number[][]; elevationsM: number[]; grades: number[]
 }
 export const courseElevationProfiles = data.profiles as Record<string, CourseElevationProfile>
-const cache = new WeakMap<object, CourseElevationProfile | null>()
+const cache = new WeakMap<object, {id:string;lengthM:number;profile:CourseElevationProfile|null}>()
 /** Geographic road estimates are bound to their reviewed layout, never merely
  * to an id supplied by an imported/custom Free Mode session. */
 export function elevationProfileFor(id: string, points: readonly (readonly number[])[], lengthM: number) {
   const cached=cache.get(points)
-  if (cached!==undefined) return cached
+  if (cached?.id===id && cached.lengthM===lengthM) return cached.profile
   const profile=courseElevationProfiles[id]
   let valid=!!profile && Math.abs(profile.lengthM-lengthM)<Math.max(2,lengthM*0.002)
   if (valid) {
@@ -23,7 +23,7 @@ export function elevationProfileFor(id: string, points: readonly (readonly numbe
     const a=sample(points),b=sample(profile.planarPoints)
     valid=a.every((p,i)=>Math.hypot(p[0]-b[i][0],p[1]-b[i][1])<0.0025)
   }
-  const resolved=valid?profile:null;cache.set(points,resolved);return resolved
+  const resolved=valid?profile:null;cache.set(points,{id,lengthM,profile:resolved});return resolved
 }
 /** Periodic linear interpolation keeps start/finish continuous. Absolute
  * altitude is retained for physics; rendering subtracts one common datum. */
