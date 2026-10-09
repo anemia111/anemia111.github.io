@@ -29,6 +29,14 @@ driving game.
   but are visibly marked cancelled.
 - `src/data/realTrackLayouts.ts` contains 23 OpenF1-derived centerlines and the
   official 2026 MADRING organizer vector. Do not hand-edit its point arrays.
+- The map now offers 2D and elevation-aware 3D at x1/x3/x5 (default x3), with
+  per-corner heights, provenance and independent terrain/corner-value selection.
+  `src/data/renderTerrainElevations.json` adds 21 aligned 96-station SRTM terrain
+  profiles; `cornerElevations.ts` preserves all 23 user-supplied arrays. These
+  are render-only inputs, not surveyed road or physical-model data. Existing
+  measured profiles take priority; MADRING uses official 671/697 m anchors with
+  connecting sections labelled inferred/interpolated. Baku defaults to supplied
+  corners with suspect T20 excluded. See `docs/RENDER_ELEVATION_MAPS.md`.
 - `src/data/measuredRoadProfiles.ts` contains reproducibly generated 96-station
   public-geodata profiles for Zandvoort, Silverstone, Suzuka, Motegi,
   Autopolis, Fuji, and SUGO. Elevation is observed/interpolated, grade is

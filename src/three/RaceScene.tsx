@@ -1,6 +1,6 @@
 import { Line, OrbitControls } from '@react-three/drei'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { memo, Suspense, useEffect, useMemo, useRef } from 'react'
+import { memo, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 import type {
@@ -32,7 +32,12 @@ import {
   createTrackRibbonGeometry,
   edgePoints,
   poseOnTrack,
+  mapPositionOnRoad,
 } from './trackGeometry'
+
+import { resolveRenderElevation, type ElevationSource } from './renderElevation'
+
+const UP = new THREE.Vector3(0, 1, 0)
 
 type RaceSceneProps = {
   cameraMode: CameraMode
@@ -223,12 +228,12 @@ function InstancedPitBoxes({ boxes }: { boxes: PosedInstance[] }) {
 
     boxes.forEach(({ index, pose }, instanceIndex) => {
       const rotationY = Math.atan2(pose.tangent.x, pose.tangent.z)
-      object.position.copy(pose.position).setY(0.12)
+      object.position.copy(pose.position).addScaledVector(UP, 0.12)
       object.rotation.set(0, rotationY, 0)
       object.updateMatrix()
       base.setMatrixAt(instanceIndex, object.matrix)
 
-      object.position.setY(0.2)
+      object.position.copy(pose.position).addScaledVector(UP, 0.2)
       object.updateMatrix()
       marker.setMatrixAt(instanceIndex, object.matrix)
       marker.setColorAt(instanceIndex, index % 2 === 0 ? cyan : gold)
@@ -423,7 +428,7 @@ function PitLane({
         const progress = entry + (index / 29) * ((exit + 1 - entry) % 1)
         const pose = poseOnTrack(curve, progress % 1, pitLaneOffset(track))
 
-        return pose.position.setY(0.1)
+        return pose.position.clone().addScaledVector(UP, 0.1)
       }),
     [curve, track],
   )
@@ -470,13 +475,13 @@ function PitLane({
       <SpriteLabel
         color="#4bd8ff"
         fontSize={0.54}
-        position={labelPose.position.setY(0.45)}
+        position={labelPose.position.clone().addScaledVector(UP, 0.45)}
         text="PIT"
       />
       <SpriteLabel
         color="#f4c430"
         fontSize={0.42}
-        position={labelPose.position.clone().setY(0.86).add(new THREE.Vector3(0, 0, 0.62))}
+        position={labelPose.position.clone().addScaledVector(UP, 0.86).add(new THREE.Vector3(0, 0, 0.62))}
         text={`${track.pitLane?.speedLimitKph ?? 80} KPH`}
       />
     </group>
@@ -503,7 +508,7 @@ function ActiveAeroZoneLines({
             presentationTrackWidth(track) / 2 + 0.16,
           )
 
-          return pose.position.setY(0.14)
+          return pose.position.clone().addScaledVector(UP, 0.14)
         })
         const labelPose = poseOnTrack(
           curve,
@@ -525,7 +530,7 @@ function ActiveAeroZoneLines({
             color="#46d880"
             fontSize={0.8}
             outlineColor="#03120a"
-            position={zone.labelPose.position.setY(0.54)}
+            position={zone.labelPose.position.clone().addScaledVector(UP, 0.54)}
             text={zone.label}
           />
         </group>
@@ -572,7 +577,7 @@ function RaceControlLines({
       {markers.map((marker) => (
         <group
           key={`${marker.label}-${marker.progress}`}
-          position={marker.pose.position.setY(0.11)}
+          position={marker.pose.position.clone().addScaledVector(UP, 0.11)}
           rotation={[0, Math.atan2(marker.pose.tangent.x, marker.pose.tangent.z), 0]}
         >
           <mesh>
@@ -635,7 +640,7 @@ function StartingGridSlots({
 
     slots.forEach(({ index, pose }, instanceIndex) => {
       const rotationY = Math.atan2(pose.tangent.x, pose.tangent.z)
-      object.position.copy(pose.position).setY(0.075)
+      object.position.copy(pose.position).addScaledVector(UP, 0.075)
       object.rotation.set(0, rotationY, 0)
       object.updateMatrix()
       slotMesh.setMatrixAt(instanceIndex, object.matrix)
@@ -644,7 +649,7 @@ function StartingGridSlots({
       object.position
         .copy(pose.position)
         .add(pose.tangent.clone().multiplyScalar(-0.78))
-        .setY(0.093)
+        .addScaledVector(UP, 0.093)
       object.updateMatrix()
       lineMesh.setMatrixAt(instanceIndex, object.matrix)
     })
@@ -694,7 +699,7 @@ function InstancedKerbs({ kerbs }: { kerbs: KerbInstance[] }) {
 
     kerbs.forEach(({ index, pose, side }, instanceIndex) => {
       const rotationY = Math.atan2(pose.tangent.x, pose.tangent.z)
-      object.position.copy(pose.position).setY(0.09)
+      object.position.copy(pose.position).addScaledVector(UP, 0.09)
       object.rotation.set(0, rotationY, 0)
       object.scale.set(1, 1, 1)
       object.updateMatrix()
@@ -704,7 +709,7 @@ function InstancedKerbs({ kerbs }: { kerbs: KerbInstance[] }) {
       object.position
         .copy(pose.position)
         .add(pose.normal.clone().multiplyScalar(side * 0.38))
-        .setY(0.06)
+        .addScaledVector(UP, 0.06)
       object.updateMatrix()
       runoffMesh.setMatrixAt(instanceIndex, object.matrix)
     })
@@ -747,12 +752,12 @@ function InstancedMarshalPosts({ posts }: { posts: [number, number, number][] })
     const cyan = new THREE.Color('#4bd8ff')
 
     posts.forEach((post, index) => {
-      object.position.set(post[0], 0.28, post[2])
+      object.position.set(post[0], post[1] + 0.28, post[2])
       object.rotation.set(0, 0, 0)
       object.updateMatrix()
       poleMesh.setMatrixAt(index, object.matrix)
 
-      object.position.setY(0.62)
+      object.position.set(post[0], post[1] + 0.62, post[2])
       object.updateMatrix()
       signMesh.setMatrixAt(index, object.matrix)
       signMesh.setColorAt(index, index % 3 === 0 ? gold : cyan)
@@ -810,8 +815,8 @@ function TrackFurniture({
     [curve, config.track],
   )
   const marshalPosts = useMemo(
-    () => (config.track.marshalPosts ?? []).filter((_, index) => index % 2 === 0),
-    [config.track.marshalPosts],
+    () => (config.track.marshalPosts ?? []).filter((_, index) => index % 2 === 0).map(post => mapPositionOnRoad(curve, post[0], post[2], 0).toArray() as [number, number, number]),
+    [config.track.marshalPosts, curve],
   )
 
   return (
@@ -820,7 +825,7 @@ function TrackFurniture({
       <Line points={barrierRight} color="#7a8389" lineWidth={1.2} />
       <InstancedKerbs kerbs={kerbs} />
       {(config.track.corners ?? []).map((corner) => (
-        <group key={corner.number} position={[corner.position[0], 0.62, corner.position[2]]}>
+        <group key={corner.number} position={mapPositionOnRoad(curve, corner.position[0], corner.position[2], 0.62)}>
           <mesh position={[0, -0.2, 0]}>
             <cylinderGeometry args={[0.16, 0.16, 0.32, 12]} />
             <meshStandardMaterial color="#f4c430" roughness={0.55} />
@@ -863,7 +868,7 @@ function SectorPathLinesContent({
       const points = Array.from({ length: 45 }, (_, pointIndex) => {
         const progress = (start + (pointIndex / 44) * span) % 1
 
-        return poseOnTrack(curve, progress, 0).position.setY(0.13)
+        return poseOnTrack(curve, progress, 0).position.clone().addScaledVector(UP, 0.13)
       })
       const labelProgress = (start + span * 0.5) % 1
       const labelPose = poseOnTrack(
@@ -888,7 +893,7 @@ function SectorPathLinesContent({
       const progress =
         (start + (pointIndex / (sampleCount - 1)) * span) % 1
 
-      return poseOnTrack(curve, progress, 0).position.setY(0.2)
+      return poseOnTrack(curve, progress, 0).position.clone().addScaledVector(UP, 0.2)
     })
     const labelProgress = (start + span * 0.48) % 1
     const labelPose = poseOnTrack(
@@ -927,7 +932,7 @@ function SectorPathLinesContent({
             <SpriteLabel
               color={color}
               fontSize={isControlled ? 0.94 : 0.84}
-              position={sector.labelPose.position.setY(0.56)}
+              position={sector.labelPose.position.clone().addScaledVector(UP, 0.56)}
               text={
                 isControlled
                   ? `${sectorFlagLabels[flag]} S${index + 1}`
@@ -948,14 +953,14 @@ function SectorPathLinesContent({
             color={yellowSeverity === 'double' ? '#ffae00' : '#ffe35a'}
             fontSize={yellowSeverity === 'double' ? 1 : 0.9}
             outlineColor="#071019"
-            position={localYellow.labelPose.position.setY(0.68)}
+            position={localYellow.labelPose.position.clone().addScaledVector(UP, 0.68)}
             text={yellowSeverity === 'double' ? 'DOUBLE YELLOW' : 'SINGLE YELLOW'}
           />
           <SpriteLabel
             color="#ffffff"
             fontSize={0.72}
             outlineColor="#b9162e"
-            position={localYellow.incidentPose.position.setY(0.62)}
+            position={localYellow.incidentPose.position.clone().addScaledVector(UP, 0.62)}
             text="INCIDENT"
           />
         </group>
@@ -1029,7 +1034,7 @@ function TrackSurface({
             fontSize={0.92}
             key={corner.number}
             outlineColor="#071019"
-            position={[corner.position[0], 0.46, corner.position[2]]}
+            position={mapPositionOnRoad(curve, corner.position[0], corner.position[2], 0.46)}
             text={`${corner.number}`}
           />
         ))
@@ -1121,7 +1126,7 @@ function CarMarker({
       snapshotElapsedSeconds,
     )
 
-    return pose.position.setY(0.54)
+    return pose.position.clone().addScaledVector(UP, 0.54)
   }, [
     car,
     curve,
@@ -1253,7 +1258,7 @@ function SafetyCarMarker({
       )
     }
 
-    return pose.position.setY(0.5)
+    return pose.position.clone().addScaledVector(UP, 0.5)
   }, [curve, elapsedSeconds, leader.progress, procedure, track])
 
   useEffect(() => () => markerTexture.dispose(), [markerTexture])
@@ -1337,7 +1342,7 @@ function OpenF1CarOverlay({
 
       const pose = poseOnTrack(curve, progressAtTime(car, windowTimeMs), 0)
 
-      group.position.copy(pose.position.setY(0.46))
+      group.position.copy(pose.position.clone().addScaledVector(UP, 0.46))
       group.lookAt(group.position.clone().add(pose.tangent))
     }
 
@@ -1349,7 +1354,7 @@ function OpenF1CarOverlay({
       <SpriteLabel
         color="#4bd8ff"
         fontSize={0.5}
-        position={tagPose.position.setY(0.72)}
+        position={tagPose.position.clone().addScaledVector(UP, 0.72)}
         text={`OpenF1 ${mode}`}
       />
       {overlay.cars.map((car) => (
@@ -1426,6 +1431,7 @@ function CameraRig({
 
     return {
       center,
+      height: dimensions.y,
       halfDepth: dimensions.z / 2,
       halfWidth: dimensions.x / 2,
     }
@@ -1448,12 +1454,12 @@ function CameraRig({
     return {
       position: new THREE.Vector3(
         overviewFrame.center.x,
-        cameraHeight,
-        overviewFrame.center.z + 0.01,
+        cameraHeight + overviewFrame.center.y,
+        overviewFrame.center.z + (overviewFrame.height > 0.001 ? cameraHeight * 0.42 : 0.01),
       ),
       target: new THREE.Vector3(
         overviewFrame.center.x,
-        0,
+        overviewFrame.center.y,
         overviewFrame.center.z,
       ),
     }
@@ -1474,7 +1480,7 @@ function CameraRig({
       selectedGarageBayIndex,
       snapshotElapsedSeconds,
     )
-    const target = pose.position.setY(0.5)
+    const target = pose.position.clone().addScaledVector(UP, 0.5)
 
     return {
       chasePosition: target
@@ -1713,7 +1719,10 @@ function SceneContents({
 }
 
 export function RaceScene(props: RaceSceneProps) {
-  const curve = useMemo(() => createTrackCurve(props.config.track), [props.config.track])
+  const [heightMultiplier, setHeightMultiplier] = useState(3)
+  const [source, setSource] = useState<ElevationSource>('auto')
+  const elevation = useMemo(() => resolveRenderElevation(props.config.track, source), [props.config.track, source])
+  const curve = useMemo(() => createTrackCurve(props.config.track, elevation, heightMultiplier), [props.config.track, elevation, heightMultiplier])
   const trackWidth = presentationTrackWidth(props.config.track)
   const roadGeometry = useMemo(
     () => createTrackRibbonGeometry(curve, trackWidth),
@@ -1728,7 +1737,30 @@ export function RaceScene(props: RaceSceneProps) {
     [curve, trackWidth],
   )
 
+  useEffect(() => () => roadGeometry.dispose(), [roadGeometry])
+
   return (
+    <div className="elevation-map">
+    <div className="elevation-controls" aria-label="Map elevation controls">
+      <div className="elevation-heading"><strong>{elevation.min.toFixed(0)}–{elevation.max.toFixed(0)} m</strong><span>高低差 {(elevation.max-elevation.min).toFixed(1)} m</span></div>
+      <div className="elevation-actions">
+        <label>高さ <select aria-label="Elevation scale" value={heightMultiplier} onChange={e => setHeightMultiplier(Number(e.target.value))}>
+          <option value={0}>2D</option><option value={1}>3D ×1</option><option value={3}>3D ×3</option><option value={5}>3D ×5</option>
+        </select></label>
+        <label>データ <select aria-label="Elevation source" value={source} onChange={e => setSource(e.target.value as ElevationSource)}>
+          <option value="auto">推奨</option><option value="corners">コーナー値</option><option value="terrain">公開地形</option>
+        </select></label>
+      </div>
+      <details><summary>{elevation.sourceLabel}</summary>
+        <p>{elevation.note}</p>
+        {elevation.sourceUrl ? <a href={elevation.sourceUrl} target="_blank" rel="noreferrer">出典を開く</a> : null}
+        <p>高さ倍率は表示のみ。標高値は倍率を掛けていません。</p>
+        <div className="elevation-corners">{(props.config.track.corners ?? []).map(c => {
+          const p = elevation.cornerProgress(c.number)
+          return <span key={c.number}>T{c.number}: {p === undefined ? 'N/A' : elevation.elevationAt(p).toFixed(1)} m</span>
+        })}</div>
+      </details>
+    </div>
     <Canvas
       camera={{ fov: 48, near: 0.1, far: 220, position: [0, 47, 0.01] }}
       className="race-canvas"
@@ -1752,5 +1784,6 @@ export function RaceScene(props: RaceSceneProps) {
         />
       </Suspense>
     </Canvas>
+    </div>
   )
 }

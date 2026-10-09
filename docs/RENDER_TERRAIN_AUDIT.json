@@ -1,0 +1,149 @@
+[
+  {
+    "id": "albert-park-approx",
+    "status": "terrain-available",
+    "alignmentError": 0.0002558782528790937,
+    "min": 6,
+    "max": 13
+  },
+  {
+    "id": "bahrain-approx",
+    "status": "terrain-available",
+    "alignmentError": 0.000677781251181675,
+    "min": 7,
+    "max": 28
+  },
+  {
+    "id": "shanghai-approx",
+    "status": "terrain-available",
+    "alignmentError": 0.0000383546858105932,
+    "min": 2,
+    "max": 6
+  },
+  {
+    "id": "barcelona-approx",
+    "status": "terrain-available",
+    "alignmentError": 0.00006671795135959613,
+    "min": 112,
+    "max": 143
+  },
+  {
+    "id": "monaco-approx",
+    "status": "terrain-available",
+    "alignmentError": 0.0008063960245732193,
+    "min": 1,
+    "max": 53
+  },
+  {
+    "id": "montreal-approx",
+    "status": "terrain-available",
+    "alignmentError": 0.00009072596445203196,
+    "min": 6,
+    "max": 13
+  },
+  {
+    "id": "red-bull-ring-approx",
+    "status": "terrain-available",
+    "alignmentError": 0.0006188045000551368,
+    "min": 677,
+    "max": 738
+  },
+  {
+    "id": "hungaroring-approx",
+    "status": "terrain-available",
+    "alignmentError": 0.00014795817586621407,
+    "min": 204,
+    "max": 240
+  },
+  {
+    "id": "spa-approx",
+    "status": "terrain-available",
+    "alignmentError": 0.00006499295420592244,
+    "min": 365,
+    "max": 468
+  },
+  {
+    "id": "monza-approx",
+    "status": "terrain-available",
+    "alignmentError": 0.00003525587928310259,
+    "min": 180,
+    "max": 197
+  },
+  {
+    "id": "singapore-approx",
+    "status": "terrain-available",
+    "alignmentError": 0.0001716139446183984,
+    "min": 1,
+    "max": 29
+  },
+  {
+    "id": "cota-approx",
+    "status": "terrain-available",
+    "alignmentError": 0.0010024788133706775,
+    "min": 152,
+    "max": 183
+  },
+  {
+    "id": "mexico-city-approx",
+    "status": "terrain-available",
+    "alignmentError": 0.0002756071671042859,
+    "min": 2227,
+    "max": 2243
+  },
+  {
+    "id": "interlagos-approx",
+    "status": "terrain-available",
+    "alignmentError": 0.0014331002085181677,
+    "min": 746,
+    "max": 786
+  },
+  {
+    "id": "yas-marina-approx",
+    "status": "terrain-available",
+    "alignmentError": 0.00039712828778426523,
+    "min": -3,
+    "max": 4
+  },
+  {
+    "id": "jeddah-approx",
+    "status": "terrain-available",
+    "alignmentError": 0.0005174695025033094,
+    "min": 0,
+    "max": 8
+  },
+  {
+    "id": "miami-approx",
+    "status": "terrain-available",
+    "alignmentError": 0.0015145992038551048,
+    "min": 5,
+    "max": 12
+  },
+  {
+    "id": "lusail-approx",
+    "status": "terrain-available",
+    "alignmentError": 0.0009366981719386436,
+    "min": 10,
+    "max": 16
+  },
+  {
+    "id": "madrid-approx",
+    "status": "terrain-available",
+    "alignmentError": 0.0001270507940158705,
+    "min": 671,
+    "max": 701
+  },
+  {
+    "id": "baku-approx",
+    "status": "terrain-available",
+    "alignmentError": 0.0001797661641692594,
+    "min": -21,
+    "max": 11
+  },
+  {
+    "id": "las-vegas-approx",
+    "status": "terrain-available",
+    "alignmentError": 0.00012871300389638574,
+    "min": 631,
+    "max": 655
+  }
+]

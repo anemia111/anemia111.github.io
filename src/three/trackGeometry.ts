@@ -1,13 +1,43 @@
 import * as THREE from 'three'
 import type { TrackDefinition } from '../types'
+import type { RenderElevation } from './renderElevation'
 
-export function createTrackCurve(track: TrackDefinition) {
-  return new THREE.CatmullRomCurve3(
-    track.centerline.map((point) => new THREE.Vector3(...point)),
+export function createTrackCurve(track: TrackDefinition, elevation?: RenderElevation, heightMultiplier = 1) {
+  const curve = new THREE.CatmullRomCurve3(
+    track.centerline.map((point) => new THREE.Vector3(point[0], elevation ? 0 : point[1], point[2])),
     true,
     'catmullrom',
     0.48,
   )
+  if (elevation) {
+    const planarPointAt = curve.getPointAt.bind(curve)
+    // Preserve planar stationing: changing elevation must never move an operational
+    // marker or a car along X/Z through THREE's 3D arc-length reparameterisation.
+    curve.getPointAt = (progress, target = new THREE.Vector3()) => {
+      const p = ((progress % 1) + 1) % 1
+      planarPointAt(p, target)
+      target.y = (elevation.elevationAt(p)-elevation.min)*elevation.unitsPerMeter*heightMultiplier
+      return target
+    }
+    curve.getTangentAt = (progress, target = new THREE.Vector3()) => {
+      const before = curve.getPointAt(progress-0.00001)
+      return target.copy(curve.getPointAt(progress+0.00001)).sub(before).normalize()
+    }
+  }
+  return curve
+}
+
+const mapSamples = new WeakMap<THREE.CatmullRomCurve3, THREE.Vector3[]>()
+/** Used only for static corner/post labels whose coordinates are stored in X/Z. */
+export function mapPositionOnRoad(curve: THREE.CatmullRomCurve3, x: number, z: number, offset: number) {
+  let points = mapSamples.get(curve)
+  if (!points) { points = curve.getSpacedPoints(512); mapSamples.set(curve, points) }
+  let nearest = points[0], best = Infinity
+  for (const point of points) {
+    const error = (point.x-x)**2+(point.z-z)**2
+    if (error < best) { best = error; nearest = point }
+  }
+  return new THREE.Vector3(x, nearest.y+offset, z)
 }
 
 export function poseOnTrack(
@@ -76,6 +106,6 @@ export function edgePoints(
     const tangent = curve.getTangentAt(progress).normalize()
     const normal = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize()
 
-    return center.add(normal.multiplyScalar((width / 2) * side)).setY(0.06)
+    return center.add(normal.multiplyScalar((width / 2) * side)).add(new THREE.Vector3(0, 0.06, 0))
   })
 }
