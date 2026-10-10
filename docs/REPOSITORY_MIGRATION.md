@@ -11,6 +11,8 @@
 - The integration commit retains both masters as parents, without rewriting history.
 - Historical development branch tips are retained under `archive/development/*`.
 - `src`, `public` and `vite.config.ts` remain identical to the actual published source.
+- The desktop playtest selects playback speed buttons by exact accessible name,
+  avoiding collisions with the published map elevation controls. Runtime code is unchanged.
 - External backups: `source-all.bundle`, `target-all.bundle`, `published-before.zip`,
   Pages/environment settings and the source branch inventory. Both bundles passed
   `git bundle verify`. Keep a copy outside this workstation.

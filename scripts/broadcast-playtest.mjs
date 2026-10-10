@@ -1112,7 +1112,7 @@ async function inspectFreeMode(browser) {
     .count()
   await page.getByLabel('Close pit wall').click()
 
-  await page.getByRole('button', { exact: true, name: '60x', exact: true }).click()
+  await page.getByRole('button', { exact: true, name: '60x' }).click()
   await page.waitForFunction(
     () =>
       document
