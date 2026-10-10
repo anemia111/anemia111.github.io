@@ -32,7 +32,7 @@ describe('strategy evidence', () => {
   it('round-trips evidence through the actual checkpoint and accepts older snapshots', () => {
     const restored = parseRaceCheckpoint(serializeRaceCheckpoint('log', { ...snapshot, strategyDecisions: [decision] }, 1000), 'log', config, 1000)
     expect(restored?.strategyDecisions).toEqual([decision])
-    expect(parseRaceCheckpoint(serializeRaceCheckpoint('old', snapshot, 1000), 'old', config, 1000)?.strategyDecisions).toEqual([])
+    expect(parseRaceCheckpoint(serializeRaceCheckpoint('old', snapshot, 1000), 'old', config, 1000)?.strategyDecisions).toBeUndefined()
   })
 
   it.each([

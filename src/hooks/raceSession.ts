@@ -1296,7 +1296,9 @@ function migrateRaceSnapshot(
 
   return {
     ...value,
-    strategyDecisions: parseStrategyDecisions(value.strategyDecisions, value),
+    ...(value.strategyDecisions === undefined
+      ? {}
+      : { strategyDecisions: parseStrategyDecisions(value.strategyDecisions, value) }),
     cars: value.cars.map((car) => {
       const persisted = car as CarSnapshot &
         Partial<
