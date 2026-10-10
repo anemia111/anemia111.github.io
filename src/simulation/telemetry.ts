@@ -63,9 +63,9 @@ import {
 import { brakeHardwareCapacityFor } from './brakeDynamics'
 import { trackDynamicsAt } from './trackDynamics'
 import { freshCompoundGripFor } from './tireCompoundPace'
+import { trackAtmosphereAt } from './roadEnvironment'
 import { gripForSurfaceWater } from './trackWater'
 import {
-  airDensityKgM3,
   combustionWheelPowerKwAt,
   dirtyAirDownforceMultiplier,
   fuelMassEffects,
@@ -306,10 +306,7 @@ export function calculateCarTelemetry(options: {
       rainIntensityMmH: 0,
       surfaceWaterMm,
     } satisfies TireTrackCondition)
-  const ambientAirDensityKgM3 = airDensityKgM3({
-    altitudeMeters: track.altitudeMeters,
-    temperatureC: airTemperatureC,
-  })
+  const ambientAirDensityKgM3 = trackAtmosphereAt(track, car.progress, airTemperatureC).airDensityKgM3
   const dynamics = trackDynamicsAt(
     track,
     standingStartLaunchActive && car.progress >= 0.88 ? 0 : car.progress,

@@ -1070,7 +1070,7 @@ describe('multi-axis vehicle dynamics', () => {
     const level = stepAtGrade(0)
     const uphill = stepAtGrade(0.01)
     const downhill = stepAtGrade(-0.01)
-    const cappedUphill = stepAtGrade(0.035)
+    const cappedUphill = stepAtGrade(0.2)
     const overLimitUphill = stepAtGrade(0.35)
     const unavailable = stepAtGrade(Number.NaN)
 

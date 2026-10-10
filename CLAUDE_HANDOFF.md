@@ -511,3 +511,24 @@ are source/discretion/bundle boundaries, not hidden completion claims.
   it is a tuning reference rather than a prediction for every race lap.
 - Numeric acceptance covers all 23 course targets to 0.005 s on the reference
   model, live compound traction, and retained slipstream effects.
+
+## Road grade and local-altitude force follow-up
+
+- Live road gravity already existed, but its ±3.5% clamp flattened the sourced
+  8% MADRING grade. Shared `roadEnvironment.roadGradeForceN` now retains source
+  grades through ±20%, using mg sin(atan(rise/run)); invalid input stays neutral.
+- Live atmosphere now reads absolute source-labelled point elevation first,
+  then track altitude, then the explicit 100 m SIM fallback. Rendering Y is
+  never an altitude input. Temperature still modifies density. Missing profile
+  grade remains 0%; this change does not invent new elevation surveys.
+- Density feeds both drag and downforce. The physical reference-lap forward
+  sweep now subtracts road gravity and the backward braking sweep includes
+  its signed contribution. Both use local density, so offline and live paths
+  consume the same environmental inputs without adding gravity twice.
+- Reference atmosphere defaults to 15 C unless an air temperature is provided;
+  simplified qualifying passes simulated air temperature, while explicit
+  density overrides remain available for controlled benchmarks. Peak downforce
+  reporting now uses per-point density too.
+- Numeric tests cover 8% uphill/downhill acceleration, density/drag/downforce
+  ratios at 2200 m, source precedence, unavailable/invalid fallbacks, local
+  reference inputs and continued circuit compound-pace calibration.

@@ -32,6 +32,8 @@ import {
   maximumLateralAccelerationMps2,
 } from './tyreForces'
 import { brakeHardwareCapacityFor } from './brakeDynamics'
+import { roadGradeForceN } from './roadEnvironment'
+export { airDensityKgM3 } from './roadEnvironment'
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value))
@@ -288,18 +290,6 @@ export function towDragReductionFor(options: {
     0,
     0.07,
   )
-}
-
-export function airDensityKgM3(options: {
-  altitudeMeters?: number
-  temperatureC?: number
-}) {
-  const altitudeMeters = options.altitudeMeters ?? 100
-  const temperatureK = (options.temperatureC ?? 25) + 273.15
-  const pressurePa =
-    101325 * Math.pow(1 - 2.25577e-5 * clamp(altitudeMeters, -100, 3000), 5.25588)
-
-  return pressurePa / (287.05 * temperatureK)
 }
 
 export type ActiveAeroForceAssumptions = Readonly<{
@@ -1266,12 +1256,7 @@ function integrateVehicleLongitudinalStepWithBudget(
     massKg * GRAVITY_MPS2 * categoryPhysics.rollingResistanceCoefficient
   // Road grade is a direct physical rise/run fraction. Render-centreline Y is
   // deliberately not a force input; unavailable road data resolves neutrally.
-  const roadGrade = clamp(
-    finiteOr(input.dynamics.roadGradeFraction, 0),
-    -0.035,
-    0.035,
-  )
-  const gradeForceN = massKg * GRAVITY_MPS2 * Math.sin(Math.atan(roadGrade))
+  const gradeForceN = roadGradeForceN(massKg, input.dynamics.roadGradeFraction)
   const activeAeroState =
     input.activeAeroState ?? activeAeroStateForMode(input.activeAeroMode)
   const inferredPitchDegrees =
