@@ -430,7 +430,8 @@ describe('track-dependent systems', () => {
   it('uses a source-labelled track profile in the live race force path', () => {
     const track = tracks[0]
     const config = {
-      drivers: initialDrivers,
+      // Isolate grip response from stationary retired-car occupancy.
+      drivers: initialDrivers.slice(0, 1),
       seed: 'surface-profile-live-race',
       teams: initialTeams,
       track,
