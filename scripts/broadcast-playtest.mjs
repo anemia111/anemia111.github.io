@@ -358,6 +358,11 @@ async function runViewport(browser, name, viewport, screenshotPath) {
 
   const batteryValues = await page.locator('.leaderboard-rows button > span:last-child').allInnerTexts()
   const tireLifeValues = await page.locator('.leaderboard-tire-life').allInnerTexts()
+  const tireAgeValues = await page.locator('.leaderboard-tire-age').allInnerTexts()
+  const tireAgesFit = await page.locator('.leaderboard-tire-status').evaluateAll((cells) => cells.every((cell) => {
+    const age = cell.querySelector('.leaderboard-tire-age')
+    return age && age.getBoundingClientRect().right <= cell.getBoundingClientRect().right + 1
+  }))
   const sectorStatuses = await page.locator('.leaderboard-rows .sector-value').evaluateAll((cells) => ({
     overallBest: cells.filter((cell) => cell.classList.contains('sector-status-overall-best')).length,
     personalBest: cells.filter((cell) => cell.classList.contains('sector-status-personal-best')).length,
@@ -824,6 +829,8 @@ async function runViewport(browser, name, viewport, screenshotPath) {
     speed60Selected,
     strategyControlsVisible,
     tireLifeValues,
+    tireAgeValues,
+    tireAgesFit,
     typography,
     runningMiniSectorStates,
     tokenInputVisible,
@@ -1242,6 +1249,9 @@ try {
     if (result.centerMapLayout.mapHeightRatio < 0.55) failures.push(`track map did not expand into the removed panel space: ${JSON.stringify(result.centerMapLayout)}`)
     if (result.tireLifeValues.some((value) => !/^\d{1,3}$/u.test(value) || Number(value) < 0 || Number(value) > 100)) failures.push(`tyre life must be a 100-to-0 remaining value: ${result.tireLifeValues.join(', ')}`)
     if (result.tireLifeValues.every((value) => Number(value) === 100)) failures.push('tyre life never decreased from 100 during the accelerated run')
+    if (result.tireAgeValues.length !== result.leaderboardRows || result.tireAgeValues.some((value) => !/^\d+L$/u.test(value))) failures.push('tyre age must show completed laps beside every tyre life value')
+    if (result.tireAgeValues.every((value) => value === '0L')) failures.push('tyre age never increased during the accelerated run')
+    if (!result.tireAgesFit) failures.push('tyre age is clipped beside tyre life')
     for (const [name, count] of [
     ]) {
       if (count !== result.leaderboardRows) failures.push(`${name} table rendered ${count}/${result.leaderboardRows} drivers`)

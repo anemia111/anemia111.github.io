@@ -472,3 +472,23 @@ the latest decision record, and retains `legacy-direct` as rollback. Local
 yellow order is explicitly enforced while passable obstructions remain
 exempt. No known implementation phase remains open; the numbered limits above
 are source/discretion/bundle boundaries, not hidden completion claims.
+# Tyre degradation and age follow-up
+
+- F1 C1–C5 and I/W degradation now share explicit SIM stint targets. Default
+  H/M/S uses C2/C3/C4 consistently with the thermal model. These rates are
+  simulator policy, not published Pirelli degradation measurements.
+- Representative pre-cliff pace slopes (s/lap before driver management) are
+  C1 .035, C2 .050, C3 .070, C4 .095, C5 .125, I .065, W .045. Base cliff
+  ages are 40/32/25/18/13/26/34 laps respectively. Physical wear reaches 70%
+  at the management-adjusted cliff before track, fuel, pace and thermal loads.
+- Live remaining life uses measured SIM wear plus irreversible thermal stress;
+  age only estimates life if wear state is unavailable. The timing tower shows
+  completed laps on the fitted set beside life, including SF set age.
+- Carcass heat now contributes to overheating and permanent thermal damage
+  after surface cooling. Carcass equilibrium stays closer to the surface;
+  reversible overheating still cools, while wear and thermal stress persist.
+- SF retains its separate control-tyre availability boundary; no F1 wear or
+  thermal coefficients are applied to it.
+- `tireDegradation.test.ts` covers every family, controlled stints, push/save,
+  heat/cooling, wet-tyre cooling loss, allocation consistency and observed-rate
+  confidence. Desktop playtest also checks age text and column clipping.

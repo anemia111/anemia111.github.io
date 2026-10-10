@@ -551,20 +551,26 @@ function LeftLeaderboard({
                   )}
                 </span>
                 {row.tireDisplay.kind === 'f1-pirelli' ? (
-                  <span
-                    aria-label={`${labels[row.tireDisplay.compound]} tyre, ${tireLife ?? '--'}% life remaining`}
-                    className={`broadcast-tire leaderboard-tire-life tire-${row.tireDisplay.compound}`}
-                    title={`${labels[row.tireDisplay.compound]} tyre: ${tireLife ?? '--'}% life remaining`}
-                  >
-                    {tireLife ?? '--'}
+                  <span className="leaderboard-tire-status">
+                    <span
+                      aria-label={`${labels[row.tireDisplay.compound]} tyre, ${tireLife ?? '--'}% life remaining, ${row.tireDisplay.ageLaps} laps on set`}
+                      className={`broadcast-tire leaderboard-tire-life tire-${row.tireDisplay.compound}`}
+                      title={`${labels[row.tireDisplay.compound]} tyre: ${tireLife ?? '--'}% life remaining / ${row.tireDisplay.ageLaps} laps on set`}
+                    >
+                      {tireLife ?? '--'}
+                    </span>
+                    <small className="leaderboard-tire-age" title="Completed laps on this tyre set">{row.tireDisplay.ageLaps}L</small>
                   </span>
                 ) : (
-                  <span
-                    aria-label={`SUPER FORMULA ${row.tireDisplay.surface} control tyre, ${row.tireDisplay.lapsOnCurrentSet} laps on set; physical model unavailable`}
-                    className="broadcast-tire leaderboard-tire-life"
-                    title={`${row.tireDisplay.surface.toUpperCase()} control tyre / ${row.tireDisplay.lapsOnCurrentSet} laps; physical model unavailable`}
-                  >
-                    {row.tireDisplay.surface.toUpperCase()}
+                  <span className="leaderboard-tire-status">
+                    <span
+                      aria-label={`SUPER FORMULA ${row.tireDisplay.surface} control tyre, ${row.tireDisplay.lapsOnCurrentSet} laps on set; physical model unavailable`}
+                      className="broadcast-tire leaderboard-tire-life"
+                      title={`${row.tireDisplay.surface.toUpperCase()} control tyre / ${row.tireDisplay.lapsOnCurrentSet} laps; physical model unavailable`}
+                    >
+                      {row.tireDisplay.surface.toUpperCase()}
+                    </span>
+                    <small className="leaderboard-tire-age" title="Completed laps on this tyre set">{row.tireDisplay.lapsOnCurrentSet}L</small>
                   </span>
                 )}
                 <span className={status ? 'status-value' : undefined}>
