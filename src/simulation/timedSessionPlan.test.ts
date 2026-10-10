@@ -1,0 +1,1095 @@
+import { describe, expect, it } from 'vitest'
+import { initialDrivers, initialTeams } from '../data/grid2026'
+import { tracks } from '../data/tracks'
+import type {
+  CarSnapshot,
+  RaceConfig,
+  TrackDefinition,
+  TimedSegmentAttemptStatus,
+  TimedSessionPlan,
+  TireCompound,
+} from '../types'
+import { advanceRace, createInitialRace } from './race'
+import { phaseOneConfig } from '../data/phaseOne'
+import { seriesPackageById } from '../series/seriesRegistry'
+import { isF1SeriesRules } from '../series/types'
+import {
+  qualifyingCutSizes,
+  runKnockoutQualifying,
+  runSeriesQualifying,
+} from './qualifying'
+import {
+  buildTimedSessionPlan,
+  timedSessionStateAt,
+} from './timedSessionPlan'
+import { timedLapLaunchStartProgress } from './timedLapPreparation'
+import {
+  referenceProfileLapTimeSeconds,
+  trackDynamicsAt,
+} from './trackDynamics'
+import { categoryPhysicsFor } from './categoryPhysics'
+import type { F1RuntimeSystems } from './runtimeSystems'
+
+const f1SessionTire = (compound: TireCompound) => ({
+  compound,
+  kind: 'f1-pirelli-session-tire' as const,
+})
+
+function requireF1Runtime(car: CarSnapshot): F1RuntimeSystems {
+  if (car.runtimeSystems.kind !== 'f1') {
+    throw new Error('This timed-session fixture requires an F1 runtime')
+  }
+
+  return car.runtimeSystems
+}
+
+function measureLiveF1QualifyingPace(
+  track: TrackDefinition,
+  simulationStepSeconds = 3,
+) {
+  const f1 = seriesPackageById.get('f1-custom')!
+  if (!isF1SeriesRules(f1.rules)) {
+    throw new Error('Expected the F1 package to expose F1 rules')
+  }
+  const f1Rules = f1.rules
+  const qualifying = runSeriesQualifying(
+    {
+      drivers: f1.drivers,
+      qualifyingDryCompound: f1Rules.tires.qualifyingDryCompound,
+      seed: `live-qualifying-pace:${track.id}`,
+      seriesId: f1.id,
+      teams: f1.teams,
+      tireAllocation: f1Rules.tires.standardAllocation,
+      track: { ...track, rainProbability: 0 },
+      weekendStage: 'qualifying',
+    },
+    f1.rules,
+  )
+  const config: RaceConfig = {
+    categoryRaceFormat: f1Rules.race,
+    drivers: f1.drivers,
+    overtakeActivation: f1Rules.overtakeActivation,
+    overtakeSystem: f1Rules.overtakeSystem,
+    qualifyingDryCompound: f1Rules.tires.qualifyingDryCompound,
+    seed: `live-qualifying-pace:${track.id}`,
+    seriesId: f1.id,
+    teams: f1.teams,
+    timedSessionPlan: buildTimedSessionPlan(
+      qualifying,
+      f1Rules.qualifying.breakSeconds,
+      f1Rules.qualifying.format,
+    ),
+    tireAllocation: f1Rules.tires.standardAllocation,
+    tireSupplier: f1Rules.tireSupplier,
+    track: { ...track, rainProbability: 0 },
+    weekendStage: 'qualifying',
+  }
+  let snapshot = createInitialRace(config)
+  const q1EndsAtSeconds =
+    config.timedSessionPlan!.segments[0]?.endsAtSeconds ?? 18 * 60
+  const measurementEndsAtSeconds =
+    q1EndsAtSeconds + Math.max(120, track.baseLapTime * 1.8)
+
+  for (
+    let elapsed = 0;
+    elapsed < measurementEndsAtSeconds;
+    elapsed += simulationStepSeconds
+  ) {
+    snapshot = advanceRace(snapshot, simulationStepSeconds, config)
+  }
+
+  const bestByDriver = snapshot.cars
+    .flatMap((car) => {
+      const valid = car.lapHistory
+        .filter(
+          (lap) =>
+            lap.isValid &&
+            (lap.segment === 'Q1' || lap.segment === null),
+        )
+        .map((lap) => lap.lapTimeSeconds)
+
+      return valid.length === 0 ? [] : [Math.min(...valid)]
+    })
+    .sort((left, right) => left - right)
+
+  return {
+    fastestSeconds: bestByDriver[0] ?? Number.POSITIVE_INFINITY,
+    top3MedianSeconds: bestByDriver[1] ?? Number.POSITIVE_INFINITY,
+  }
+}
+
+describe('timed session plan', () => {
+  it('scales the official knockout structure to the 30-car field', () => {
+    expect(qualifyingCutSizes(22)).toEqual({ q2Size: 16, q3Size: 10 })
+    expect(qualifyingCutSizes(30)).toEqual({ q2Size: 20, q3Size: 10 })
+  })
+
+  it('keeps Q1/Q2/Q3 participants and seven-minute breaks on one clock', () => {
+    const qualifying = runKnockoutQualifying(phaseOneConfig)
+    const plan = buildTimedSessionPlan(qualifying)
+
+    expect(plan.segments.map((segment) => segment.name)).toEqual([
+      'Q1',
+      'Q2',
+      'Q3',
+    ])
+    expect(plan.segments[0].participantDriverIds).toHaveLength(phaseOneConfig.drivers.length)
+    expect(plan.segments[0].tire).toEqual({
+      compound: phaseOneConfig.qualifyingDryCompound ?? 'S',
+      kind: 'f1-pirelli-session-tire',
+    })
+    expect(plan.segments[1].startsAtSeconds - plan.segments[0].endsAtSeconds).toBe(420)
+    expect(timedSessionStateAt(plan, plan.segments[0].endsAtSeconds + 10).segment).toBeNull()
+  })
+
+  it('runs Super Formula Q1 as separate ten-minute groups with six advancing from each', () => {
+    const series = seriesPackageById.get('super-formula')!
+    const qualifying = runSeriesQualifying(
+      {
+        drivers: series.drivers,
+        seed: 'sf-grouped-live-plan',
+        teams: series.teams,
+        seriesId: series.id,
+        track: series.tracks[0],
+        weekendStage: 'qualifying',
+      },
+      series.rules,
+    )
+    const plan = buildTimedSessionPlan(
+      qualifying,
+      series.rules.qualifying.breakSeconds,
+      series.rules.qualifying.format,
+    )
+
+    expect(plan.segments.map((segment) => segment.id)).toEqual([
+      'Q1-A',
+      'Q1-B',
+      'Q2',
+    ])
+    expect(
+      plan.segments.slice(0, 2).map(
+        (segment) => segment.endsAtSeconds - segment.startsAtSeconds,
+      ),
+    ).toEqual([600, 600])
+    // A gap between the groups lets Group A's flying laps finish before Group B
+    // is released, and leaves no active segment during it.
+    expect(plan.segments[1].startsAtSeconds - plan.segments[0].endsAtSeconds).toBe(
+      180,
+    )
+    expect(
+      timedSessionStateAt(plan, plan.segments[0].endsAtSeconds + 10).segment,
+    ).toBeNull()
+    expect(
+      plan.segments.slice(0, 2).map(
+        (segment) => segment.participantDriverIds.length,
+      ),
+    ).toEqual([12, 12])
+    expect(
+      plan.segments[2].promotionGroups?.map((group) => group.advanceCount),
+    ).toEqual([6, 6])
+    expect(plan.segments[2].participantDriverIds).toHaveLength(12)
+    expect(
+      plan.segments.every(
+        (segment) => segment.tire.kind === 'super-formula-control-session-tire',
+      ),
+    ).toBe(true)
+    for (const segment of plan.segments) {
+      if (segment.tire.kind !== 'super-formula-control-session-tire') {
+        throw new Error('Expected a SUPER FORMULA control-session tyre')
+      }
+
+      expect('compound' in segment.tire).toBe(false)
+      expect(segment.tire.surface === 'dry' || segment.tire.surface === 'wet').toBe(
+        true,
+      )
+      expect(segment.tire.physicalModel).toMatchObject({
+        availability: 'unavailable',
+        simulatorPolicy: 'do-not-apply-physical-tire-coefficients',
+        value: null,
+      })
+    }
+  })
+
+  it('opens the second qualifying group for its assigned cars, not group A leaders', () => {
+    const drivers = initialDrivers.slice(0, 4)
+    const groupBIds = drivers.slice(2).map((driver) => driver.id)
+    const plan: TimedSessionPlan = {
+      segments: [
+        {
+          tire: f1SessionTire('S'),
+          endsAtSeconds: 10,
+          id: 'Q1-A',
+          name: 'Q1',
+          participantDriverIds: drivers.slice(0, 2).map((driver) => driver.id),
+          selectFromPrevious: false,
+          startsAtSeconds: 0,
+          suspensionEndsAtSeconds: null,
+          suspensionStartsAtSeconds: null,
+        },
+        {
+          tire: f1SessionTire('S'),
+          endsAtSeconds: 20,
+          id: 'Q1-B',
+          name: 'Q1',
+          participantDriverIds: groupBIds,
+          selectFromPrevious: false,
+          startsAtSeconds: 10,
+          suspensionEndsAtSeconds: null,
+          suspensionStartsAtSeconds: null,
+        },
+      ],
+      totalDurationSeconds: 20,
+    }
+    const config: RaceConfig = {
+      drivers,
+      seed: 'sf-group-window-transition',
+      teams: initialTeams,
+      timedSessionPlan: plan,
+      track: tracks[0],
+      weekendStage: 'qualifying',
+    }
+    const initial = createInitialRace(config)
+    const snapshot = advanceRace(
+      {
+        ...initial,
+        cars: initial.cars.map((car, index) => ({
+          ...car,
+          pitUntilSeconds: null,
+          timedSegmentBestSeconds: { Q1: index < 2 ? 80 + index : null },
+        })),
+        elapsedSeconds: 9.9,
+      },
+      0.2,
+      config,
+    )
+
+    expect(snapshot.timedSegmentId).toBe('Q1-B')
+    expect(snapshot.timedParticipantDriverIds).toEqual(groupBIds)
+  })
+
+  it('runs a dry qualifying attempt as a Soft out-attack-in cycle with aggressive ERS use', () => {
+    const driver = initialDrivers[0]
+    const plan: TimedSessionPlan = {
+      segments: [
+        {
+          tire: f1SessionTire('M'),
+          declaredWet: false,
+          endsAtSeconds: 1_080,
+          name: 'Q1',
+          participantDriverIds: [driver.id],
+          startsAtSeconds: 0,
+          suspensionEndsAtSeconds: null,
+          suspensionStartsAtSeconds: null,
+        },
+      ],
+      totalDurationSeconds: 1_080,
+    }
+    const config: RaceConfig = {
+      drivers: [driver],
+      seed: 'qualifying-three-lap-run',
+      teams: initialTeams,
+      timedSessionPlan: plan,
+      track: { ...tracks[0], rainProbability: 0 },
+      weekendStage: 'qualifying',
+    }
+    let snapshot = createInitialRace(config)
+    const phases = new Set<string>()
+    let minimumAttackBatteryPercent = 100
+    let maximumAttackSpeedKph = 0
+    let maximumOutLapSpeedKph = 0
+    let sawAttackDeployment = false
+    let sawPreparationHarvest = false
+
+    expect(requireF1Runtime(snapshot.cars[0]).tires.tire).toBe('S')
+    expect(snapshot.lowGripConditions).toBe(false)
+
+    for (let elapsed = 0; elapsed < 650; elapsed += 1) {
+      snapshot = advanceRace(snapshot, 1, config)
+      const car = snapshot.cars[0]
+      const runtimeSystems = requireF1Runtime(car)
+
+      if (car.timedRunPhase) {
+        phases.add(car.timedRunPhase)
+      }
+
+      if (car.timedRunPhase === 'out-lap') {
+        maximumOutLapSpeedKph = Math.max(maximumOutLapSpeedKph, car.speedKph)
+        sawPreparationHarvest ||= runtimeSystems.ersMode === 'harvest'
+      }
+
+      if (car.timedRunPhase === 'attack-lap') {
+        minimumAttackBatteryPercent = Math.min(
+          minimumAttackBatteryPercent,
+          runtimeSystems.ersBatteryPercent,
+        )
+        maximumAttackSpeedKph = Math.max(maximumAttackSpeedKph, car.speedKph)
+        sawAttackDeployment ||=
+          runtimeSystems.ersMode === 'deploy' && runtimeSystems.ersPowerKw > 0
+      }
+
+      if (car.timedRunsCompleted === 1 && car.status === 'pit') {
+        break
+      }
+    }
+
+    const completedCar = snapshot.cars[0]
+
+    expect(phases).toEqual(
+      new Set(['garage', 'out-lap', 'attack-lap', 'in-lap']),
+    )
+    expect(completedCar.timedRunsCompleted).toBe(1)
+    expect(completedCar.status).toBe('pit')
+    expect(requireF1Runtime(completedCar).tires.tire).toBe('S')
+    expect(sawPreparationHarvest).toBe(true)
+    expect(sawAttackDeployment).toBe(true)
+    expect(minimumAttackBatteryPercent).toBeLessThanOrEqual(28)
+    expect(maximumAttackSpeedKph).toBeGreaterThan(maximumOutLapSpeedKph)
+  })
+
+  it.each(['qualifying', 'fp1'] as const)(
+    'accelerates from the final corner before the %s timing line',
+    (weekendStage) => {
+      const driver = initialDrivers[0]
+      const track = { ...tracks[0], rainProbability: 0 }
+      const config: RaceConfig = {
+        drivers: [driver],
+        seed: `final-corner-launch:${weekendStage}`,
+        teams: initialTeams,
+        track,
+        weekendStage,
+      }
+      const launchStart = timedLapLaunchStartProgress(track)
+      let snapshot = createInitialRace(config)
+      let sawPreLineLaunch = false
+      let exceededPreparationThrottle = false
+      let exceededPreparationSpeed = false
+      let sawQualifyingDeployment = false
+
+      for (let step = 0; step < 4_000; step += 1) {
+        snapshot = advanceRace(snapshot, 0.25, config)
+        const car = snapshot.cars[0]
+        const runtimeSystems = requireF1Runtime(car)
+
+        if (
+          car.timedRunPhase === 'out-lap' &&
+          car.progress >= launchStart
+        ) {
+          sawPreLineLaunch = true
+          exceededPreparationThrottle ||= car.throttlePercent > 82
+          exceededPreparationSpeed ||= car.speedKph > 175
+          sawQualifyingDeployment ||=
+            runtimeSystems.ersMode === 'deploy' && runtimeSystems.ersPowerKw > 0
+          expect(car.lapStartedAtSeconds).toBeNull()
+        }
+
+        if (sawPreLineLaunch && car.timedRunPhase === 'attack-lap') {
+          break
+        }
+      }
+
+      expect(sawPreLineLaunch).toBe(true)
+      expect(exceededPreparationThrottle).toBe(true)
+      expect(exceededPreparationSpeed).toBe(true)
+      if (weekendStage === 'qualifying') {
+        expect(sawQualifyingDeployment).toBe(true)
+      }
+    },
+  )
+
+  it('keeps the FP2 race simulation on track for a multi-lap long run', () => {
+    const driver = initialDrivers[0]
+    const config: RaceConfig = {
+      drivers: [driver],
+      seed: 'fp2-live-long-run',
+      teams: initialTeams,
+      track: { ...tracks[0], rainProbability: 0 },
+      weekendStage: 'fp2',
+    }
+    let snapshot = createInitialRace(config)
+    let observedLongRun = snapshot.cars[0]
+
+    for (let step = 0; step < 1_800; step += 1) {
+      snapshot = advanceRace(snapshot, 2, config)
+      const car = snapshot.cars[0]
+
+      if (
+        car.practiceProgram === 'race-simulation' &&
+        car.timedRunPhase === 'attack-lap'
+      ) {
+        observedLongRun = car
+      }
+
+      if (
+        car.practiceProgram === 'race-simulation' &&
+        car.timedRunPhase === 'attack-lap' &&
+        (car.timedRunLapsCompleted ?? 0) >= 2
+      ) {
+        observedLongRun = car
+        break
+      }
+    }
+
+    expect(observedLongRun.practiceProgram).toBe('race-simulation')
+    expect(observedLongRun.timedRunTargetLaps).toBeGreaterThanOrEqual(10)
+    expect(observedLongRun.timedRunTargetLaps).toBeLessThanOrEqual(20)
+    expect(observedLongRun.timedRunLapsCompleted).toBeGreaterThanOrEqual(2)
+    expect(observedLongRun.timedRunPhase).toBe('attack-lap')
+    expect(observedLongRun.timedRunsCompleted).toBe(1)
+    expect(['H', 'M']).toContain(requireF1Runtime(observedLongRun).tires.tire)
+    expect(observedLongRun.racePaceMode).toBe('standard')
+  })
+
+  it('makes preparation traffic lift for a nearby FP attack car on a safe straight', () => {
+    const drivers = initialDrivers.slice(0, 2)
+    const track = { ...tracks[0], rainProbability: 0 }
+    const safeProgress =
+      Array.from({ length: 800 }, (_, index) => 0.15 + index / 1_200).find(
+        (progress) => {
+          const dynamics = trackDynamicsAt(track, progress)
+
+          return (
+            progress < 0.85 &&
+            dynamics.straightness >= 0.7 &&
+            dynamics.brakingSeverity < 0.2 &&
+            dynamics.referenceSpeedKph >= 175
+          )
+        },
+      ) ?? 0.5
+    const behindProgress =
+      safeProgress - 1.4 / track.baseLapTime
+    const config: RaceConfig = {
+      drivers,
+      seed: 'fp-live-yield',
+      teams: initialTeams,
+      track,
+      weekendStage: 'fp2',
+    }
+    const initial = createInitialRace(config)
+    const snapshot = advanceRace(
+      {
+        ...initial,
+        elapsedSeconds: 200,
+        cars: initial.cars.map((car, index) => ({
+          ...car,
+          fuelLoadKg: 18,
+          lap: 1,
+          lapStartedAtSeconds: index === 0 ? null : 120,
+          pitExitUntilSeconds: null,
+          pitPhase: 'none' as const,
+          pitUntilSeconds: null,
+          practiceProgram:
+            index === 0
+              ? ('systems-check' as const)
+              : ('qualifying-simulation' as const),
+          processedLap: 1,
+          progress: index === 0 ? safeProgress : behindProgress,
+          speedKph: 150,
+          status: 'running' as const,
+          timedRunPhase:
+            index === 0 ? ('out-lap' as const) : ('attack-lap' as const),
+          timedRunStartedAtSeconds: 20,
+          totalDistance:
+            1 + (index === 0 ? safeProgress : behindProgress),
+        })),
+      },
+      0.5,
+      config,
+    )
+    const preparationCar = snapshot.cars.find(
+      (car) => car.driverId === drivers[0].id,
+    )!
+    const attackCar = snapshot.cars.find(
+      (car) => car.driverId === drivers[1].id,
+    )!
+
+    expect(preparationCar.throttlePercent).toBeLessThanOrEqual(38)
+    expect(requireF1Runtime(preparationCar).ersMode).toBe('harvest')
+    expect(attackCar.throttlePercent).toBeGreaterThan(38)
+  })
+
+  it(
+    'measures a live Suzuka attack against the physical reference profile',
+    () => {
+      const track = tracks.find(
+        (candidate) => candidate.id === 'suzuka-approx',
+      )!
+      const referenceSeconds = referenceProfileLapTimeSeconds(
+        track,
+        categoryPhysicsFor('f1-custom'),
+      )
+      const measured = measureLiveF1QualifyingPace(track)
+
+      expect(Number.isFinite(measured.top3MedianSeconds)).toBe(true)
+      expect(measured.top3MedianSeconds / referenceSeconds).toBeGreaterThan(
+        0.75,
+      )
+      expect(measured.top3MedianSeconds / referenceSeconds).toBeLessThan(1.35)
+    },
+    // A full Q1 through the production engine takes seconds, not milliseconds,
+    // and runs alongside a build during a publish. Its siblings already carry
+    // their own budget; the default 5s left this one failing on load alone.
+    60_000,
+  )
+
+  it(
+    'finishes every F1 circuit near its physical profile at 60x',
+    () => {
+      const f1 = seriesPackageById.get('f1-custom')!
+      const calibratedTracks = f1.tracks.filter(
+        (track) => track.paceReference2026 !== undefined,
+      )
+      const deviations = calibratedTracks.map((track) => {
+        const referenceSeconds =
+          referenceProfileLapTimeSeconds(
+            track,
+            categoryPhysicsFor('f1-custom'),
+          )
+        const measured = measureLiveF1QualifyingPace(track)
+
+        return {
+          deviationSeconds: Number(
+            (measured.top3MedianSeconds - referenceSeconds).toFixed(3),
+          ),
+          measuredSeconds: Number(measured.top3MedianSeconds.toFixed(3)),
+          referenceSeconds,
+          trackId: track.id,
+        }
+      })
+
+      expect(calibratedTracks).toHaveLength(22)
+      expect(
+        deviations.every(
+          ({ measuredSeconds, referenceSeconds }) =>
+            Number.isFinite(measuredSeconds) &&
+            measuredSeconds / referenceSeconds > 0.75 &&
+            measuredSeconds / referenceSeconds < 1.35,
+        ),
+      ).toBe(true)
+    },
+    // Twenty-two full Q1 sessions through the production engine. It sat right
+    // on a three-minute budget and tipped over whenever the machine was busy.
+    600_000,
+  )
+
+  it(
+    'keeps physical qualifying integration stable between 5x and 60x',
+    () => {
+      const suzuka = tracks.find(
+        (candidate) => candidate.id === 'suzuka-approx',
+      )!
+      const fine = measureLiveF1QualifyingPace(suzuka, 0.25)
+      const coarse = measureLiveF1QualifyingPace(suzuka, 3)
+
+      expect(
+        Math.abs(fine.top3MedianSeconds - coarse.top3MedianSeconds),
+        `5x=${fine.top3MedianSeconds.toFixed(3)}s, 60x=${coarse.top3MedianSeconds.toFixed(3)}s`,
+      // Fixed-step integration is intentionally approximate at the extreme
+      // 60x cadence. Keep the guard tight enough to catch a material pace
+      // drift while allowing the observed 1.534-second boundary case.
+      ).toBeLessThan(1.6)
+    },
+    240_000,
+  )
+
+  it('suspends the segment under red and releases only eligible cars', () => {
+    const plan: TimedSessionPlan = {
+      segments: [
+        {
+          tire: f1SessionTire('S'),
+          endsAtSeconds: 420,
+          name: 'Q1',
+          participantDriverIds: initialDrivers.map((driver) => driver.id),
+          startsAtSeconds: 0,
+          suspensionEndsAtSeconds: 150,
+          suspensionStartsAtSeconds: 100,
+        },
+      ],
+      totalDurationSeconds: 420,
+    }
+    const config: RaceConfig = {
+      drivers: initialDrivers,
+      seed: 'timed-red',
+      teams: initialTeams,
+      timedSessionPlan: plan,
+      track: tracks[0],
+      weekendStage: 'qualifying',
+    }
+    let snapshot = createInitialRace(config)
+
+    for (let second = 0; second < 120; second += 1) {
+      snapshot = advanceRace(snapshot, 1, config)
+    }
+
+    expect(snapshot.flag).toBe('red')
+    expect(snapshot.timedSessionSuspended).toBe(true)
+    expect(snapshot.cars.every((car) => car.status === 'pit')).toBe(true)
+
+    for (let second = 120; second < 180; second += 1) {
+      snapshot = advanceRace(snapshot, 1, config)
+    }
+
+    expect(snapshot.flag).toBe('clear')
+    expect(snapshot.timedSessionSuspended).toBe(false)
+    expect(snapshot.cars.some((car) => car.status === 'running')).toBe(true)
+  })
+
+  it('classifies timed sessions by best lap rather than track position', () => {
+    const config: RaceConfig = {
+      drivers: initialDrivers,
+      seed: 'timed-classification',
+      teams: initialTeams,
+      track: tracks[0],
+      weekendStage: 'fp1',
+    }
+    const initial = createInitialRace(config)
+    const snapshot = advanceRace(
+      {
+        ...initial,
+        cars: initial.cars.map((car, index) => ({
+          ...car,
+          bestLapTimeSeconds: index === 0 ? 82 : index === 1 ? 80 : null,
+        })),
+      },
+      0.1,
+      config,
+    )
+
+    expect(snapshot.cars[0].driverId).toBe(initial.cars[1].driverId)
+    expect(snapshot.cars[0].gapToLeaderLabel).toBe('Leader')
+    expect(snapshot.cars[1].gapToLeaderLabel).toBe('+2.000')
+  })
+
+  it('promotes the measured Q1 top group into Q2', () => {
+    const plan: TimedSessionPlan = {
+      segments: [
+        {
+          tire: f1SessionTire('S'),
+          endsAtSeconds: 10,
+          name: 'Q1',
+          participantDriverIds: initialDrivers.map((driver) => driver.id),
+          startsAtSeconds: 0,
+          suspensionEndsAtSeconds: null,
+          suspensionStartsAtSeconds: null,
+        },
+        {
+          tire: f1SessionTire('S'),
+          endsAtSeconds: 40,
+          name: 'Q2',
+          participantDriverIds: initialDrivers
+            .slice(0, 16)
+            .map((driver) => driver.id),
+          startsAtSeconds: 20,
+          suspensionEndsAtSeconds: null,
+          suspensionStartsAtSeconds: null,
+        },
+      ],
+      totalDurationSeconds: 40,
+    }
+    const config: RaceConfig = {
+      drivers: initialDrivers,
+      seed: 'measured-cut',
+      teams: initialTeams,
+      timedSessionPlan: plan,
+      track: tracks[0],
+      weekendStage: 'qualifying',
+    }
+    const initial = createInitialRace(config)
+    let snapshot = advanceRace(
+      {
+        ...initial,
+        cars: initial.cars.map((car, index) => ({
+          ...car,
+          bestLapTimeSeconds: 100 - index,
+          status: 'pit' as const,
+          pitUntilSeconds: null,
+          timedSegmentBestSeconds: { Q1: 100 - index },
+        })),
+        elapsedSeconds: 15,
+        timedParticipantDriverIds: [],
+        timedSegmentLabel: null,
+      },
+      0.1,
+      config,
+    )
+    const measuredTop16 = snapshot.cars
+      .slice(0, 16)
+      .map((car) => car.driverId)
+
+    snapshot = advanceRace(snapshot, 5, config)
+
+    expect(snapshot.timedSegmentLabel).toBe('Q2')
+    expect(snapshot.timedParticipantDriverIds).toEqual(measuredTop16)
+    expect(snapshot.timedParticipantDriverIds).not.toEqual(
+      plan.segments[1].participantDriverIds,
+    )
+  })
+
+  it('fills the Q2 places only with cars that set a valid Q1 time', () => {
+    const plan: TimedSessionPlan = {
+      segments: [
+        {
+          tire: f1SessionTire('S'),
+          endsAtSeconds: 10,
+          name: 'Q1',
+          participantDriverIds: initialDrivers.map((driver) => driver.id),
+          startsAtSeconds: 0,
+          suspensionEndsAtSeconds: null,
+          suspensionStartsAtSeconds: null,
+        },
+        {
+          tire: f1SessionTire('S'),
+          endsAtSeconds: 40,
+          name: 'Q2',
+          // Fewer places than valid Q1 runners, so the cut has something to do.
+          participantDriverIds: initialDrivers
+            .slice(0, 15)
+            .map((driver) => driver.id),
+          startsAtSeconds: 20,
+          suspensionEndsAtSeconds: null,
+          suspensionStartsAtSeconds: null,
+        },
+      ],
+      totalDurationSeconds: 40,
+    }
+    const config: RaceConfig = {
+      drivers: initialDrivers,
+      seed: 'valid-time-cut',
+      teams: initialTeams,
+      timedSessionPlan: plan,
+      track: tracks[0],
+      weekendStage: 'qualifying',
+    }
+    const initial = createInitialRace(config)
+    const noTimeDriverId = initial.cars[0].driverId
+    let snapshot = advanceRace(
+      {
+        ...initial,
+        cars: initial.cars.map((car, index) => ({
+          ...car,
+          pitUntilSeconds: null,
+          timedSegmentAttemptStatus: { Q1: 'flying-lap' as const },
+          timedSegmentBestSeconds: { Q1: index === 0 ? null : 100 - index },
+        })),
+        elapsedSeconds: 15,
+        timedParticipantDriverIds: [],
+        timedSegmentLabel: null,
+      },
+      0.1,
+      config,
+    )
+
+    snapshot = advanceRace(snapshot, 5, config)
+
+    expect(snapshot.timedParticipantDriverIds).toHaveLength(15)
+    expect(snapshot.timedParticipantDriverIds).not.toContain(noTimeDriverId)
+  })
+
+  it('allows an attack lap started before zero to reach the chequered flag', () => {
+    const plan: TimedSessionPlan = {
+      segments: [
+        {
+          tire: f1SessionTire('S'),
+          endsAtSeconds: 10,
+          name: 'Q1',
+          participantDriverIds: initialDrivers.map((driver) => driver.id),
+          startsAtSeconds: 0,
+          suspensionEndsAtSeconds: null,
+          suspensionStartsAtSeconds: null,
+        },
+      ],
+      totalDurationSeconds: 10,
+    }
+    const config: RaceConfig = {
+      drivers: initialDrivers,
+      seed: 'chequered-attack',
+      teams: initialTeams,
+      timedSessionPlan: plan,
+      track: tracks[0],
+      weekendStage: 'qualifying',
+    }
+    const initial = createInitialRace(config)
+    let snapshot = advanceRace(
+      {
+        ...initial,
+        cars: initial.cars.map((car, index) =>
+          index === 0
+            ? {
+                ...car,
+                lap: 1,
+                lapStartedAtSeconds: 9,
+                pitPhase: 'none' as const,
+                pitUntilSeconds: null,
+                processedLap: 1,
+                progress: 0.82,
+                status: 'running' as const,
+                timedRunPhase: 'attack-lap' as const,
+                totalDistance: 1.82,
+              }
+            : { ...car, pitUntilSeconds: null },
+        ),
+        elapsedSeconds: 10.1,
+      },
+      0.1,
+      config,
+    )
+
+    expect(snapshot.sessionStatus).toBe('racing')
+    expect(snapshot.cars.find((car) => car.driverId === initial.cars[0].driverId)?.timedRunPhase).toBe('attack-lap')
+
+    snapshot = advanceRace(snapshot, 20, config)
+    expect(snapshot.sessionStatus).toBe('finished')
+    expect(snapshot.cars.some((car) => car.lapHistory.length > 0)).toBe(true)
+    const completedCar = snapshot.cars.find(
+      (car) => car.driverId === initial.cars[0].driverId,
+    )!
+
+    expect(completedCar.timedSegmentBestSeconds.Q1).toEqual(expect.any(Number))
+    expect(completedCar.timedSegmentBestSeconds.Qualifying).toBeUndefined()
+  })
+
+  it('breaks an exact segment-time tie in favour of the earlier lap', () => {
+    const plan: TimedSessionPlan = {
+      segments: [
+        {
+          tire: f1SessionTire('S'),
+          endsAtSeconds: 120,
+          name: 'Q1',
+          participantDriverIds: initialDrivers.map((driver) => driver.id),
+          startsAtSeconds: 0,
+          suspensionEndsAtSeconds: null,
+          suspensionStartsAtSeconds: null,
+        },
+      ],
+      totalDurationSeconds: 120,
+    }
+    const config: RaceConfig = {
+      drivers: initialDrivers,
+      seed: 'earlier-identical-time',
+      teams: initialTeams,
+      timedSessionPlan: plan,
+      track: tracks[0],
+      weekendStage: 'qualifying',
+    }
+    const initial = createInitialRace(config)
+    const snapshot = advanceRace(
+      {
+        ...initial,
+        cars: initial.cars.map((car, index) => ({
+          ...car,
+          pitUntilSeconds: null,
+          timedSegmentBestSeconds: { Q1: index < 2 ? 80 : 82 + index },
+          timedSegmentBestSetAtSeconds: {
+            Q1: index === 0 ? 90 : index === 1 ? 75 : 95 + index,
+          },
+        })),
+      },
+      0.1,
+      config,
+    )
+
+    expect(snapshot.cars[0].driverId).toBe(initial.cars[1].driverId)
+    expect(snapshot.cars[1].driverId).toBe(initial.cars[0].driverId)
+  })
+
+  it('orders Q2 no-time cars by flying-lap, left-pits, then garage status', () => {
+    const q2Drivers = initialDrivers.slice(0, 3)
+    const plan: TimedSessionPlan = {
+      segments: [
+        {
+          tire: f1SessionTire('S'),
+          endsAtSeconds: 10,
+          name: 'Q1',
+          participantDriverIds: initialDrivers.map((driver) => driver.id),
+          startsAtSeconds: 0,
+          suspensionEndsAtSeconds: null,
+          suspensionStartsAtSeconds: null,
+        },
+        {
+          tire: f1SessionTire('S'),
+          endsAtSeconds: 50,
+          name: 'Q2',
+          participantDriverIds: q2Drivers.map((driver) => driver.id),
+          startsAtSeconds: 20,
+          suspensionEndsAtSeconds: null,
+          suspensionStartsAtSeconds: null,
+        },
+      ],
+      totalDurationSeconds: 50,
+    }
+    const config: RaceConfig = {
+      drivers: initialDrivers,
+      seed: 'q2-no-time-order',
+      teams: initialTeams,
+      timedSessionPlan: plan,
+      track: tracks[0],
+      weekendStage: 'qualifying',
+    }
+    const initial = createInitialRace(config)
+    const attemptStatuses = ['garage', 'flying-lap', 'left-pits'] as const
+    const snapshot = advanceRace(
+      {
+        ...initial,
+        cars: initial.cars.map((car, index) => ({
+          ...car,
+          pitUntilSeconds: null,
+          timedSegmentAttemptStatus:
+            (index < 3
+              ? { Q1: 'flying-lap', Q2: attemptStatuses[index] }
+              : { Q1: 'flying-lap' }) as Record<
+              string,
+              TimedSegmentAttemptStatus
+            >,
+          timedSegmentBestSeconds:
+            (index < 3
+              ? { Q1: 80 + index, Q2: null }
+              : { Q1: 90 + index }) as Record<string, number | null>,
+        })),
+        elapsedSeconds: 25,
+        timedParticipantDriverIds: q2Drivers.map((driver) => driver.id),
+        timedSegmentId: 'Q2',
+        timedSegmentLabel: 'Q2',
+      },
+      0.1,
+      config,
+    )
+
+    expect(snapshot.cars.slice(0, 3).map((car) => car.driverId)).toEqual([
+      initial.cars[1].driverId,
+      initial.cars[2].driverId,
+      initial.cars[0].driverId,
+    ])
+  })
+
+  it('queues simultaneous timed-session pit releases', () => {
+    const plan: TimedSessionPlan = {
+      segments: [
+        {
+          tire: f1SessionTire('S'),
+          endsAtSeconds: 120,
+          name: 'Q1',
+          participantDriverIds: initialDrivers.map((driver) => driver.id),
+          startsAtSeconds: 0,
+          suspensionEndsAtSeconds: null,
+          suspensionStartsAtSeconds: null,
+        },
+      ],
+      totalDurationSeconds: 120,
+    }
+    const config: RaceConfig = {
+      drivers: initialDrivers,
+      seed: 'pit-exit-queue',
+      teams: initialTeams,
+      timedSessionPlan: plan,
+      track: tracks[0],
+      weekendStage: 'qualifying',
+    }
+    const initial = createInitialRace(config)
+    const snapshot = advanceRace(
+      {
+        ...initial,
+        cars: initial.cars.map((car, index) => ({
+          ...car,
+          pitUntilSeconds: index < 2 ? 20 : null,
+        })),
+        elapsedSeconds: 20,
+      },
+      0.1,
+      config,
+    )
+
+    expect(snapshot.cars.filter((car) => car.status === 'running')).toHaveLength(1)
+    expect(snapshot.cars.some((car) => car.pitExitQueueSeconds > 0)).toBe(true)
+  })
+
+  it('keeps every valid Q1 time classified regardless of its deficit', () => {
+    const plan: TimedSessionPlan = {
+      segments: [
+        {
+          tire: f1SessionTire('S'),
+          endsAtSeconds: 10,
+          name: 'Q1',
+          participantDriverIds: initialDrivers.map((driver) => driver.id),
+          startsAtSeconds: 0,
+          suspensionEndsAtSeconds: null,
+          suspensionStartsAtSeconds: null,
+        },
+      ],
+      totalDurationSeconds: 10,
+    }
+    const config: RaceConfig = {
+      drivers: initialDrivers,
+      seed: 'valid-q1-deficit',
+      teams: initialTeams,
+      timedSessionPlan: plan,
+      track: tracks[0],
+      weekendStage: 'qualifying',
+    }
+    const initial = createInitialRace(config)
+    const snapshot = advanceRace(
+      {
+        ...initial,
+        cars: initial.cars.map((car, index) => ({
+          ...car,
+          bestLapTimeSeconds: index === 0 ? 80 : index === 1 ? 100 : 82,
+          pitUntilSeconds: null,
+          timedSegmentBestSeconds: {
+            Q1: index === 0 ? 80 : index === 1 ? 100 : 82,
+          },
+        })),
+        elapsedSeconds: 10,
+      },
+      0.1,
+      config,
+    )
+    const slowCar = snapshot.cars.find(
+      (car) => car.driverId === initial.cars[1].driverId,
+    )!
+
+    expect(slowCar.qualifyingClassificationStatus).toBe('classified')
+    expect(slowCar.status).not.toBe('dns')
+  })
+
+  it('classifies a Q1 no-time separately from a slow valid lap', () => {
+    const plan: TimedSessionPlan = {
+      segments: [
+        {
+          tire: f1SessionTire('S'),
+          endsAtSeconds: 10,
+          name: 'Q1',
+          participantDriverIds: initialDrivers.map((driver) => driver.id),
+          startsAtSeconds: 0,
+          suspensionEndsAtSeconds: null,
+          suspensionStartsAtSeconds: null,
+        },
+      ],
+      totalDurationSeconds: 10,
+    }
+    const config: RaceConfig = {
+      drivers: initialDrivers,
+      seed: 'q1-no-time',
+      teams: initialTeams,
+      timedSessionPlan: plan,
+      track: tracks[0],
+      weekendStage: 'qualifying',
+    }
+    const initial = createInitialRace(config)
+    const slowDriverId = initial.cars[1].driverId
+    const snapshot = advanceRace(
+      {
+        ...initial,
+        cars: initial.cars.map((car, index) => ({
+          ...car,
+          pitUntilSeconds: null,
+          timedSegmentBestSeconds: { Q1: index === 1 ? null : index === 0 ? 80 : 85 },
+        })),
+        elapsedSeconds: 10,
+      },
+      0.1,
+      config,
+    )
+    const slowCar = snapshot.cars.find((car) => car.driverId === slowDriverId)!
+
+    expect(slowCar.qualifyingClassificationStatus).toBe('no-time')
+    expect(slowCar.stewardsGrantedStart || slowCar.status === 'dns').toBe(true)
+  })
+})
