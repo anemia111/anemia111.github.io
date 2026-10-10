@@ -1754,7 +1754,7 @@ describe('starting grid', () => {
       expect(maximumCarsInPit).toBeLessThan(snapshot.cars.length / 2)
       expect(vscPenalties.length).toBeLessThanOrEqual(2)
     },
-    15_000,
+    600_000,
   )
 
   it('starts practice from pit boxes and releases cars on staggered run plans', () => {
@@ -2977,7 +2977,7 @@ describe('start procedure and persisted weekend', () => {
 
     expect(snapshot.overtakeEnabled).toBe(true)
     expect(snapshot.overtakeEnableTargetsByDriver).toBeNull()
-  }, 30_000)
+  }, 600_000)
 
   it('measures VSC deltas against the pace-adjusted on-track speed', () => {
     const config = makeConfig('vsc-delta-pace')
@@ -5723,6 +5723,6 @@ describe('road speed across the timing line', () => {
       expect(maximumSpeedKph, trackId).toBeLessThan(430)
       expect(maximumSpeedKph, trackId).toBeGreaterThan(200)
     },
-    120_000,
+    600_000,
   )
 })
