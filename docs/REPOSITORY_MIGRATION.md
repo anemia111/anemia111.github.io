@@ -3,11 +3,14 @@
 ## Baseline and retained history
 
 - Development master: `0ae1525795996f781fa52d313616989d633b26ba`.
+- Actual published source: `5ce08c447dc9117babb78bc0208f55c429cf69bc`
+  on feat/all-category-elevation-motion, 53 commits ahead of development master.
+  This published source is the migration baseline, preserving the live features.
 - Published master: `ebc5f61e3e676f69da64b3a62d5034dffc0bd1a3`.
 - Both repositories were public at migration time.
 - The integration commit retains both masters as parents, without rewriting history.
 - Historical development branch tips are retained under `archive/development/*`.
-- `src`, `public` and `vite.config.ts` remain identical to development master.
+- `src`, `public` and `vite.config.ts` remain identical to the actual published source.
 - External backups: `source-all.bundle`, `target-all.bundle`, `published-before.zip`,
   Pages/environment settings and the source branch inventory. Both bundles passed
   `git bundle verify`. Keep a copy outside this workstation.

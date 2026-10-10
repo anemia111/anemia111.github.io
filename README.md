@@ -1,5 +1,11 @@
 # Formula Race Simulator
 
+The unified repository preserves the actual October 9 published source,
+including the WEC, SUPER GT, IndyCar and KYOJO category expansion, 348-person
+driver pool, shared telemetry, course elevations and category-specific physics.
+The feature notes below include the earlier F1/SUPER FORMULA baseline; consult
+CLAUDE_HANDOFF.md and docs/EXPANSION_2026.md for the expanded runtime.
+
 PC-first F1 and SUPER FORMULA race-control and timing simulator built with
 React, TypeScript, Vite, Three.js, and React Three Fiber. Formula 2 and Formula
 3 identities remain available in the historical driver pool, but those series
