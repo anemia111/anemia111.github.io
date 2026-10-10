@@ -531,43 +531,29 @@ describe('timed session plan', () => {
     60_000,
   )
 
-  it(
-    'finishes every F1 circuit near its physical profile at 60x',
-    () => {
-      const f1 = seriesPackageById.get('f1-custom')!
-      const calibratedTracks = f1.tracks.filter(
-        (track) => track.paceReference2026 !== undefined,
+  const calibratedF1Tracks = seriesPackageById.get('f1-custom')!.tracks.filter(
+    (track) => track.paceReference2026 !== undefined,
+  )
+
+  it('covers all 22 calibrated F1 circuits in the live pace checks', () => {
+    expect(calibratedF1Tracks).toHaveLength(22)
+  })
+
+  // Each course still runs a complete Q1 through the production engine.
+  // Separate cases keep one wall-clock budget from spanning 22 sessions and
+  // identify the course if its live/reference pace ratio regresses.
+  it.each(calibratedF1Tracks)(
+    'finishes $id near its physical profile at 60x',
+    (track) => {
+      const referenceSeconds = referenceProfileLapTimeSeconds(
+        track,
+        categoryPhysicsFor('f1-custom'),
       )
-      const deviations = calibratedTracks.map((track) => {
-        const referenceSeconds =
-          referenceProfileLapTimeSeconds(
-            track,
-            categoryPhysicsFor('f1-custom'),
-          )
-        const measured = measureLiveF1QualifyingPace(track)
-
-        return {
-          deviationSeconds: Number(
-            (measured.top3MedianSeconds - referenceSeconds).toFixed(3),
-          ),
-          measuredSeconds: Number(measured.top3MedianSeconds.toFixed(3)),
-          referenceSeconds,
-          trackId: track.id,
-        }
-      })
-
-      expect(calibratedTracks).toHaveLength(22)
-      expect(
-        deviations.every(
-          ({ measuredSeconds, referenceSeconds }) =>
-            Number.isFinite(measuredSeconds) &&
-            measuredSeconds / referenceSeconds > 0.75 &&
-            measuredSeconds / referenceSeconds < 1.35,
-        ),
-      ).toBe(true)
+      const measuredSeconds = measureLiveF1QualifyingPace(track).top3MedianSeconds
+      expect(Number.isFinite(measuredSeconds)).toBe(true)
+      expect(measuredSeconds / referenceSeconds).toBeGreaterThan(0.75)
+      expect(measuredSeconds / referenceSeconds).toBeLessThan(1.35)
     },
-    // Twenty-two full Q1 sessions through the production engine. It sat right
-    // on a three-minute budget and tipped over whenever the machine was busy.
     600_000,
   )
 
