@@ -1,0 +1,39 @@
+# Claude Start Prompt
+
+```text
+Please continue this PC-first F1 race-control simulator.
+
+Before editing, read:
+- CLAUDE_HANDOFF.md
+- CLAUDE.md
+- README.md
+- docs/FIA_2026_REGULATION_COVERAGE.md
+
+Important constraints:
+- The race engine is SIM; OpenF1 is a separately labelled LIVE/HIST/SIM layer.
+- Preserve all 24 verified layouts, including the official MADRING vector and
+  its explicit lack of an OpenF1 telemetry-coordinate projection.
+- Preserve fixed-tick Worker ownership and the explicit SIM/HIST/LIVE contract.
+- Preserve measured 24-part mini-sector timing and provisional purple-to-green
+  transitions; never recolor from projected lap time.
+- Preserve independent S1/S2/S3 yellow and double-yellow state in SIM and
+  observed OpenF1 modes.
+- Preserve the canonical CSV-backed 10-team field (20 fielded cars from a
+  30-driver CSV with reserves) and its requested `NAK` car number 31 and `RB`
+  identity; do not silently alter the supplied performance values.
+- Qualifying promotion and grids must use measured Q1/Q2/Q3 or SQ results.
+- Keep cars on one racing line without artificial lateral battle movement.
+- Do not add onboard/replay/radio playback/multi-camera broadcast features.
+- Do not add mobile work, GLB cars, video, post-processing, or heavy frame work.
+- Keep simulation logic deterministic and separate from Three.js rendering.
+- Preserve existing changes and add numeric regression tests for model edits.
+
+Before handing back, run:
+- npm run lint
+- npm run build
+- npm test
+- npm run playtest
+- npm run benchmark (with a dev or preview server running)
+
+Summarize changed files, verified behavior, and any honest remaining limits.
+```

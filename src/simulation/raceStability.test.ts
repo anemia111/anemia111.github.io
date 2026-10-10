@@ -1,0 +1,96 @@
+import { describe, expect, it } from 'vitest'
+import { initialDrivers, initialTeams } from '../data/grid2026'
+import { tracks } from '../data/tracks'
+import type { CarSnapshot, RaceConfig, RaceSnapshot } from '../types'
+import { advanceRace, createInitialRace } from './race'
+
+const scenarios = [
+  ['street', 'monaco-approx'],
+  ['high-speed', 'monza-approx'],
+  ['weather-risk', 'singapore-approx'],
+] as const
+
+function runScenario(label: string, trackId: string): RaceSnapshot {
+  const track = tracks.find((candidate) => candidate.id === trackId)
+
+  if (!track) {
+    throw new Error(`Missing stability-test track: ${trackId}`)
+  }
+
+  const config: RaceConfig = {
+    drivers: initialDrivers,
+    seed: `stability:${label}`,
+    teams: initialTeams,
+    track,
+  }
+  let snapshot = createInitialRace(config)
+
+  // This is a bounded-state acceptance pass, not a frame-cadence test. Six
+  // simulated seconds keeps the same 15,000-second guard while halving the
+  // repeated full-field work used by the three complete races.
+  for (
+    let step = 0;
+    step < 2_500 && snapshot.sessionStatus !== 'finished';
+    step += 1
+  ) {
+    snapshot = advanceRace(snapshot, 6, config)
+  }
+
+  return snapshot
+}
+
+function finiteCarState(car: CarSnapshot) {
+  if (car.runtimeSystems.kind !== 'f1') {
+    return false
+  }
+
+  return [
+    car.totalDistance,
+    car.progress,
+    car.speedKph,
+    car.fuelLoadKg,
+    car.runtimeSystems.ersBatteryPercent,
+    car.runtimeSystems.tires.tireAgeLaps,
+    car.runtimeSystems.tires.tireWearPercent,
+    car.runtimeSystems.tires.tireTemperatureC,
+    car.brakeTemperatureC,
+    car.gapToLeader,
+    car.gapToAhead,
+  ].every(Number.isFinite)
+}
+
+describe('multi-circuit race stability', () => {
+  it(
+    'finishes representative seeded races with bounded, ordered car state',
+    () => {
+      for (const [label, trackId] of scenarios) {
+        const snapshot = runScenario(label, trackId)
+
+        expect(snapshot.sessionStatus, label).toBe('finished')
+        expect(snapshot.cars, label).toHaveLength(initialDrivers.length)
+        expect(snapshot.cars.map((car) => car.position), label).toEqual(
+          Array.from({ length: initialDrivers.length }, (_, index) => index + 1),
+        )
+
+        for (const car of snapshot.cars) {
+          expect(finiteCarState(car), `${label}:${car.code}`).toBe(true)
+          expect(car.progress, `${label}:${car.code}:progress`).toBeGreaterThanOrEqual(0)
+          expect(car.progress, `${label}:${car.code}:progress`).toBeLessThanOrEqual(1)
+          expect(car.runtimeSystems.kind, `${label}:${car.code}:runtime`).toBe('f1')
+          if (car.runtimeSystems.kind !== 'f1') {
+            throw new Error(`Expected F1 runtime for ${car.code}`)
+          }
+          expect(car.runtimeSystems.ersBatteryPercent, `${label}:${car.code}:battery`).toBeGreaterThanOrEqual(0)
+          expect(car.runtimeSystems.ersBatteryPercent, `${label}:${car.code}:battery`).toBeLessThanOrEqual(100)
+          expect(car.runtimeSystems.tires.tireWearPercent, `${label}:${car.code}:wear`).toBeGreaterThanOrEqual(0)
+          expect(car.runtimeSystems.tires.tireWearPercent, `${label}:${car.code}:wear`).toBeLessThanOrEqual(100)
+          expect(car.fuelLoadKg, `${label}:${car.code}:fuel`).toBeGreaterThanOrEqual(0)
+        }
+      }
+    },
+    // Three complete 20-car races include the operational causal-agent inbox
+    // and replay boundary. The assertion is a bounded-state acceptance pass,
+    // not a frame-cadence micro-benchmark; frame cadence has separate tests.
+    300_000,
+  )
+})

@@ -1,0 +1,91 @@
+# FIA 2026 regulation coverage
+
+Audited against the frozen public documents available on 2026-08-08:
+
+- Sporting Regulations, Section B, Issue 08, 2026-08-05
+- Technical Regulations, Section C, Issue 20, 2026-08-05
+- Operational Regulations, Section F, Issue 10, 2026-08-05
+- FIA 2026 power-unit and superclip refinements, 2026-04-20
+- Formula 1 Driving Standards Guidelines, v01, 2026-02-26
+- Formula 1 Penalty Guidelines, v01, 2026
+
+The app treats FIA rules, FIA event directives, observed OpenF1 data, and
+simulation estimates as different provenance classes. A value is not labelled
+FIA when the corresponding competition document is not public or normalized.
+
+## Implemented race-affecting rules
+
+| Area | FIA reference | Simulator behaviour |
+| --- | --- | --- |
+| Rain Hazard | B1.5.11 | Declaration when forecast probability exceeds 40%, or when the simulated Race Director declares it after rain begins. |
+| Heat Hazard | B1.5.10, C4.6 | Heat Index is calculated from air temperature and humidity. A declared Sprint/Race adds 5 kg for the cooling system; other sessions at that Competition add 2 kg. |
+| Low Grip Conditions | B1.5.12 | Stateful Race Director declaration with drying hysteresis. Qualifying cannot return to Normal Grip with five minutes or less remaining in a period. |
+| Active aero | B7.1.1-B7.1.2, C3.10.10/C3.11.6 | Normal Grip permits full activation in mapped zones. Front and rear positions transition continuously within 400 ms. State changes are restricted to stationary cars or Activation Zones, and a failure returns to the Corner-safe state. Low Grip prohibits full activation and permits front-wing-only partial activation in mapped Low Grip zones. |
+| Overtake | B7.2.2-B7.2.3 | Disabled at a race start, under Safety Car, and in Low Grip. Detection-line eligibility is latched and activation-line use is modelled. |
+| ERS-K power | C5.2.7-C5.2.8 | One pure authority applies the exact Normal, Overtake and Race/Sprint power-limited speed curves, then the absolute 350 kW cap. The non-public Low Grip curve fails closed as unavailable rather than using an estimate. |
+| Energy Store | C5.2.9 | MJ is the runtime truth and UI percentage is derived from the fixed 4 MJ usable window. CU-K DC power, stored power, mechanical power, and battery/inverter/motor losses are separate ledger entries. |
+| Recharge | C5.2.10, B7.2.1 | Recharge is counted before battery loss at the CU-K HV DC Bus. The technical base is 8.5 MJ; event Competition Information supplies context-specific totals and the qualifying floor is 4 MJ. Suzuka document 4 is normalized as 8.5 MJ Race inactive, 9.0 MJ Race active at the Line, 8.0 MJ Qualifying, and 9.0 MJ Free Practice/non-Race out-lap. Missing event contexts fail unavailable. Low Grip behind the Safety Car is unlimited rather than an additive allowance. |
+| Superclip | C5.2, FIA 2026-04-20 refinement | Full-throttle superclip is an actual generator operating mode: ICE wheel power remains positive, generator mechanical power lowers net wheel power, and CU-K recharge increases. The communicated 2–4 s/lap duration is an observational sanity target, never a fixed runtime timer; the current fixed-duration invariant probe leaves the complete-lap comparison unavailable. |
+| Standing start ERS | C5.2.12 | MGU-K deployment is blocked below 50 km/h, except for the existing SECU low-power-start safety state. |
+| Race and Sprint distance | B2.3/B2.5 | Sprint exceeds 100 km; Grand Prix uses the official event lap count and time limits. |
+| Qualifying format | B2.4, B4.3 | Q1/Q2/Q3 run for 18/15/13 minutes with seven-minute intervals. The regulation's larger-field progression scales with the fielded entry: the default 20-car field runs 20 to 15 to 10, and a larger custom entry (for example 30 cars) extends to 30 to 20 to 10. Exact ties favour the earlier lap, Q2/Q3 no-time ordering uses flying-lap/left-pits/garage groups and the prior period, and a lap started before zero may finish. Team release waves target traffic gaps and avoid consecutive team-mate releases. Dry attempts use Soft tyres and execute an out lap, attack lap and in lap; the attack map targets a low end-of-lap SOC while preserving the published power and recharge ceilings. |
+| Sprint Qualifying | B2.2, B6.3.9 | SQ1/SQ2 use Medium and SQ3 uses Soft in dry conditions. |
+| Tyre allocation | B6.2.4 | Standard H2/M3/S8/I5/W2 and alternative H2/M4/S6/I6/W2 allocations. |
+| Race tyre rule | B6.3.6 | Two dry specifications are required unless Intermediate or Wet tyres were used. |
+| Wet Safety Car start | B5.10, B6.3.7 | Severe-rain starts can run formation laps behind the Safety Car; when mandated, all cars use Wet tyres until the Safety Car returns. |
+| VSC | B5.12 | Cars follow a marshalling-sector delta rather than a fixed speed cap; overtaking is disabled. `VSC ENDING` starts a deterministic 10-15 second wait before the panels turn green. |
+| Neutralised pit strategy | B5.12-B5.14 | Relative pit loss is lower under VSC and lower again behind the Safety Car, but the strategy remains car-specific. VSC service is tyre-only; damage repair is deferred. Red-flag tyre changes are recalculated from weather, tyre condition, remaining sets and track position rather than applied to every car. |
+| VSC infringements | B5.12.2, Penalty Guidelines v01 | Delta is sampled only when a car completes one of the 24 timing mini-sectors. Two/three completed red sectors produce 5s, four 10s, five a drive-through, and six a 10s stop-and-go. A red end-delta produces 5s, rising to 10s above 3s and a drive-through above 5s. CPU pace first establishes a small positive margin, then closed-loop control returns toward the minimum time. |
+| Safety Car | B5.13 | Yellow is shown before deployment. The leader catches the SC, the field forms a queue, the SC may route the field through the pit lane, and the physical SC returns through Pit Entry Road. Final-lap SC finishes remain under yellow. |
+| SC lapped-car procedure | B5.13.4-B5.13.5 | Eligibility is frozen at the prescribed second SC1 crossing. Only named eligible cars pass, the pit exit may close, cars rejoin at the tail without racing, and withdrawal normally follows at the end of the following lap. |
+| SC spacing and restart | B5.13.2, B5.13.6 | Ten-car-length spacing is used, rising to twenty in low visibility. After `SAFETY CAR IN THIS LAP`, the leader controls a stable restart pace and overtaking remains prohibited until the Line. |
+| Defending | Driving Standards G/H | One defensive direction change and no defensive line change after deceleration begins. |
+| Track limits | B1.8.6, Penalty Guidelines v01 | White lines define the track. The first two race infringements are strikes, the third shows the black-and-white flag, and the fourth plus every additional infringement adds 5s. Timed-session laps are deleted. |
+| Off-track advantage and safe rejoin | B1.8.6/B1.9.6, ISC App. L IV 2(c) | Ordinary track-limit strikes are separated from retained sporting advantage. An off-track car waits until both the minimum recovery time and clear physical gaps ahead and behind are satisfied, then rejoins at reduced speed. The simulator's 1.5s-ahead/3.0s-behind margins are conservative model parameters, not FIA-prescribed fixed gaps. Imported or externally observed unsafe rejoins can still be held as steward cases. |
+| Contact and accidents | ISC App. L IV 2(d), Penalty Guidelines v01 | Contact is classified as an incident; safety-relevant wall contact or a crash is classified as an accident. Responsibility, consequence and mitigation determine no further action, 5s, 10s, drive-through or stop-and-go. |
+| Yellow flags | B1.8.4, B5.12.2(c)(iv), B5.13.2(c)(viii), ISC App. H 2.5.5 | Single and double yellow are separate visual and pace states. Only cars traversing the active local zone slow; an obviously disabled, off-track, or incident-delayed car does not anchor the neutralised queue, so following cars can pass the obstruction while preserving order behind the last unaffected car. Failure to slow produces the guideline penalty appropriate to single or double yellow. |
+| Blue flags | B1.8.4, ISC App. H 2.5.5 | A whole-lap deficit alone does not trigger blue. The simulator first identifies the next lapping boundary, then displays blue only when the faster car is within the configured three-second proximity window. The three-second threshold is a simulator operational calibration, not a fixed FIA time prescribed by these articles. Multiple-lap deficits are supported. Persistent non-compliance scales from 5s to a drive-through. |
+| Pit-lane offences | B1.6.2-B1.6.3, Penalty Guidelines v01 | Race speeding below 6 km/h excess is 5s, 6-15 km/h is a drive-through, and above 15 km/h is a 10s stop-and-go. Unsafe release scales from 5s to a drive-through and only gives driver points when driver fault is modelled. |
+| Start infringements | B5.11.1, Penalty Guidelines v01 | False-start movement scales through 5s, 10s, drive-through and mandatory 10s stop-and-go outcomes. |
+| Serving penalties | B1.9.6 | Time penalties are served at the next ordinary stop. Drive-through and stop-and-go penalties allow two Line crossings, three when issued in the final three laps; SC/VSC crossings extend the allowance and the penalty cannot normally be served under neutralisation. |
+| Race-control escalation | B5.12-B5.14 | Incidents begin with sector yellow or double yellow. Obstruction and recovery conditions then determine VSC, SC or red flag rather than jumping directly from green. |
+| Sprint points threshold | B2.6 | No Sprint points are awarded below 50% distance or without at least two consecutive green-flag laps. |
+
+## Public-data boundaries
+
+- Product rule: the fictional custom championship does not apply a 107%
+  cutoff. A valid Q1 time remains classified regardless of deficit; no-time
+  and all-laps-deleted cases still require permission to start.
+
+- `FIA-F1-DOC-111` contains the competition-specific Low Grip ERS curves but is
+  not part of the public regulation PDF. The corresponding runtime input is
+  explicitly unavailable; no numeric curve is invented.
+- Activation zones, detection lines, recharge values, and specified ERS
+  sectors may be amended in event documents. Suzuka recharge values are
+  normalized from Power Unit Information document 4; every other missing
+  context remains unavailable rather than inheriting Suzuka or a track guess.
+- The Penalty Guidelines are guidelines rather than automatic mandatory
+  outcomes unless expressly marked mandatory. The simulation therefore keeps
+  responsibility, consequence, mitigating circumstances, and steward review
+  separate from the underlying incident event.
+- Offences the autonomous cars are designed never to commit, including ignoring
+  a black flag, crossing a red pit-exit light, or deliberately racing under a
+  red flag, are not injected merely to create spectacle. They remain outside
+  the stochastic incident generator until the corresponding physical procedure
+  can be represented without a fake fixed event.
+- Financial Regulations, factory operations, homologation drawings, material
+  tests, and physical scrutineering do not alter the live race simulation and
+  are intentionally outside runtime scope.
+
+## Official sources
+
+- https://www.fia.com/regulation/category/2182
+- https://www.fia.com/news/refinements-2026-fia-formula-1-regulations-agreed-all-stakeholders
+- https://www.fia.com/system/files/decision-document/2026_japanese_grand_prix_-_power_unit_information.pdf
+- https://www.fia.com/system/files/documents/fia_2026_f1_regulations_-_section_b_sporting_-_iss_08_-_2026-08-05_7.pdf
+- https://www.fia.com/system/files/documents/fia_2026_f1_regulations_-_section_c_technical_-_iss_20_-_2026-08-05.pdf
+- https://www.fia.com/system/files/documents/fia_2026_f1_regulations_-_section_f_operational_-_iss_10_-_2026-08-05.pdf
+- https://www.fia.com/system/files/documents/appendix_h_2026_published_12032026.pdf
+- https://www.fia.com/system/files/documents/doc_3_-_2026_spielberg_event_-_f2_spielberg_competition_notes_2026_v1.pdf
+- https://www.fia.com/sites/default/files/2026_f1_driving_standards_guidelines.pdf
+- https://www.fia.com/sites/default/files/2026_f1_penalty_guidelines.pdf
