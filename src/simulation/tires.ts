@@ -6,6 +6,7 @@ import type {
   RacePaceMode,
   TireCompound,
   TireNomination,
+  TirePaceGaps,
   TirePerformanceState,
   WeatherState,
 } from '../types'
@@ -148,6 +149,17 @@ function specFor(
   }
 
   return tireCompounds[compound]
+}
+
+export function freshTireOffsetSeconds(
+  compound: TireCompound,
+  nomination?: TireNomination,
+  paceGaps?: TirePaceGaps,
+): number {
+  if (paceGaps && isDryCompound(compound)) {
+    return compound === 'H' ? paceGaps.hardToMedium : compound === 'S' ? -paceGaps.mediumToSoft : 0
+  }
+  return specFor(compound, nomination).offsetSeconds
 }
 
 function dryFamilyFor(
@@ -415,17 +427,21 @@ export function tireDeltaSeconds(
     TireDynamicState,
     'carcassTemperatureC' | 'grainingPercent' | 'overheatingPercent'
   >,
+  paceGaps?: TirePaceGaps,
 ): number {
   const spec = specFor(compound, nomination)
   const sampleWeight = Math.min(0.55, Math.max(0, (observed?.sampleCount ?? 0) / 40))
   const observedPaceOffsetSeconds = observed?.paceOffsetSeconds
   const wearPerLapSeconds = spec.wearPerLapSeconds * observedDegradationScale(spec, observed)
-  const freshPaceOffset =
+  const modeledFreshPaceOffset =
     observedPaceOffsetSeconds === null ||
     observedPaceOffsetSeconds === undefined
       ? spec.offsetSeconds
       : spec.offsetSeconds * (1 - sampleWeight) +
         observedPaceOffsetSeconds * sampleWeight
+  const freshPaceOffset = paceGaps && isDryCompound(compound)
+    ? freshTireOffsetSeconds(compound, nomination, paceGaps)
+    : modeledFreshPaceOffset
   // Better tire management shallows the wear slope.
   const wearFactor = 1.35 - tireManagement * 0.5
   const cliff = effectiveCliffLaps(compound, tireManagement, nomination)

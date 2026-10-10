@@ -494,6 +494,13 @@ export type TireNomination = {
   sourceUrl: string | null
 }
 
+/** User-authored fresh-tyre targets in seconds/lap, relative to Medium. */
+export type TirePaceGaps = {
+  hardToMedium: number
+  mediumToSoft: number
+  source: 'user'
+}
+
 export type TrackObservedCalibration = {
   cleanLapSampleCount?: number
   fuelGainPerLapSeconds?: number | null
@@ -847,6 +854,7 @@ export type TrackDefinition = {
   /** Optional source-labelled local-surface force profile. */
   surfaceProfile?: TrackSurfaceProfile
   tireNomination?: TireNomination
+  tirePaceGaps?: TirePaceGaps
   baseLapTime: number
   baseLapTimeSource?: 'estimated' | 'openf1-observed' | '2026-reference'
   /**

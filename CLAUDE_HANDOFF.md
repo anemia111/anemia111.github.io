@@ -492,3 +492,22 @@ are source/discretion/bundle boundaries, not hidden completion claims.
 - `tireDegradation.test.ts` covers every family, controlled stints, push/save,
   heat/cooling, wet-tyre cooling loss, allocation consistency and observed-rate
   confidence. Desktop playtest also checks age text and column clipping.
+
+## User-authored circuit compound pace gaps
+
+- `data/tirePaceGaps.ts` preserves the user's 24 fresh-tyre pace targets in
+  seconds/lap. Medium is zero, Hard is +hardToMedium, Soft is -mediumToSoft.
+  Values are user-authored SIM inputs, not Pirelli or observed race data.
+- 23 entries attach to current selectable courses. Imola is retained in the
+  table without creating a new track pack. Spain means Barcelona; unprovided
+  Madrid keeps its prior live behaviour.
+- `tireCompoundPace.ts` fits bounded dry grip coefficients to force-based,
+  isolated reference laps once per immutable track object. Only F1 live tyre
+  force consumes them. Wet tyres and SF remain outside this dry-pace fit.
+- Live timing and gaps are never forced to these values. Slipstream, dirty
+  air, Electrical Overtake, ERS, fuel, execution, weather and tyre condition
+  still determine the actual trajectory and timing. The offline reference
+  excludes active-aero zones and uses the unbounded capability energy policy;
+  it is a tuning reference rather than a prediction for every race lap.
+- Numeric acceptance covers all 23 course targets to 0.005 s on the reference
+  model, live compound traction, and retained slipstream effects.

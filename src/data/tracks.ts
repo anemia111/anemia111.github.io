@@ -11,6 +11,7 @@ import {
 import { realTrackLayouts } from './realTrackLayouts'
 import { sectorBoundaryReferences, sourcedSectorData } from './sectorBoundaries'
 import { tireNominationForTrack } from './tireNominations2026'
+import { tirePaceGapsByTrack } from './tirePaceGaps'
 import { calendar2026ByTrackId } from './calendar2026'
 import {
   baseLapTimeSourceForPaceReference,
@@ -1007,6 +1008,7 @@ export const tracks: TrackDefinition[] = calendarTrackIds.map((id) => {
     safetyCarLines: deriveSafetyCarLines({ ...track, pitLane }),
     ...sourcedSectorData({ id, centerline, corners: realLayout?.corners }),
     tireNomination: tireNominationForTrack(track),
+    tirePaceGaps: tirePaceGapsByTrack[id],
     width: trackWidth,
   }
 })

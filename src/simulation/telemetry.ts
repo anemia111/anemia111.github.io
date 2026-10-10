@@ -62,6 +62,7 @@ import {
 } from './tires'
 import { brakeHardwareCapacityFor } from './brakeDynamics'
 import { trackDynamicsAt } from './trackDynamics'
+import { freshCompoundGripFor } from './tireCompoundPace'
 import { gripForSurfaceWater } from './trackWater'
 import {
   airDensityKgM3,
@@ -369,7 +370,8 @@ export function calculateCarTelemetry(options: {
         team,
       })
   const compoundGrip = f1Tires
-    ? tireTrackGripMultiplier(f1Tires.tire, trackCondition)
+    ? tireTrackGripMultiplier(f1Tires.tire, trackCondition) *
+      (categoryPhysics.id === 'f1-custom' ? freshCompoundGripFor(track, f1Tires.tire) : 1)
     : 1
   // The F1 Pirelli runtime carries the state needed to resolve a live tyre
   // force envelope. SUPER FORMULA deliberately has no equivalent coefficient
