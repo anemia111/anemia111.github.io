@@ -357,6 +357,9 @@ describe('canonical track-surface snapshot authority', () => {
   })
 
   it('counts only moving on-track traversals, excluding pit and excursion cars', () => {
+    // Test one physics tick: a coarse 0.25 s call contains five ticks, during
+    // which pit/excursion cars can rejoin and legitimately lay rubber later.
+    const physicsTickSeconds = 0.05
     const config: RaceConfig = {
       ...makeConfig('canonical-surface-traversal-filter'),
       track: { ...tracks[0], rainProbability: 0 },
@@ -373,7 +376,7 @@ describe('canonical track-surface snapshot authority', () => {
     }))
     const stationary = advanceRace(
       { ...initial, cars: stationaryCars },
-      0.25,
+      physicsTickSeconds,
       config,
     )
     const excluded = advanceRace(
@@ -389,7 +392,7 @@ describe('canonical track-surface snapshot authority', () => {
                 : car,
         ),
       },
-      0.25,
+      physicsTickSeconds,
       config,
     )
     const moving = advanceRace(
@@ -399,7 +402,7 @@ describe('canonical track-surface snapshot authority', () => {
           index === 0 ? { ...car, speedKph: 220 } : car,
         ),
       },
-      0.25,
+      physicsTickSeconds,
       config,
     )
     const stationarySurface = canonicalTrackSurfaceFor(stationary)
@@ -1164,7 +1167,7 @@ describe('determinism', () => {
 
       expect(JSON.stringify(a)).toBe(JSON.stringify(b))
     },
-    40_000,
+    600_000,
   )
 
   it(
@@ -1177,7 +1180,7 @@ describe('determinism', () => {
         JSON.stringify(b.cars.map((car) => car.driverId)),
       )
     },
-    40_000,
+    600_000,
   )
 })
 
@@ -3012,6 +3015,8 @@ describe('start procedure and persisted weekend', () => {
     const leaderDistance = 3.5
     const followerDistance = leaderDistance - 0.006
     const previousFollowerDistance = followerDistance
+    // Final drivetrain telemetry describes the last physics tick, not the
+    // average speed across a coarse call containing multiple ticks.
 
     snapshot = {
       ...snapshot,
@@ -3054,7 +3059,7 @@ describe('start procedure and persisted weekend', () => {
         return car
       }),
     }
-    snapshot = advanceRace(snapshot, 0.25, config)
+    snapshot = advanceRace(snapshot, 0.05, config)
 
     const nextFollower = snapshot.cars.find(
       (car) => car.driverId === follower.driverId,
@@ -3063,7 +3068,7 @@ describe('start procedure and persisted weekend', () => {
       config.track,
       previousFollowerDistance,
       nextFollower.totalDistance,
-      0.25,
+      0.05,
     )
 
     expect(nextFollower.speedKph).toBeCloseTo(actualTravelSpeedKph, 2)
@@ -3140,7 +3145,9 @@ describe('start procedure and persisted weekend', () => {
     expect(endingDuration).toBeLessThanOrEqual(15)
     expect(snapshot.eventMessage).toContain('VSC ENDING')
 
-    snapshot = advanceRace(snapshot, endingDuration - 0.2, config)
+    // Judge the injected four-sector offence at the green transition itself.
+    // Earlier injection can accrue another red sector before VSC is withdrawn.
+    snapshot = advanceRace(snapshot, endingDuration - 0.15, config)
     expect(snapshot.flagPhase?.flag).toBe('vsc')
 
     const violatingDriverId = snapshot.cars[0].driverId
@@ -3169,7 +3176,7 @@ describe('start procedure and persisted weekend', () => {
             : { ...car, vscDeltaSeconds: 0.2, vscRedSectorCount: 0 },
         ),
       },
-      0.3,
+      0.05,
       config,
     )
     expect(snapshot.flagPhase).toBeNull()

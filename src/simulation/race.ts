@@ -3385,14 +3385,15 @@ export function advanceRace(
     const raceStartsAt = snapshot.formationBehindSafetyCar
       ? gridStartsAt
       : lightsStartAt + startLightSequenceSeconds
+    // Fixed-step accumulation can finish a few ulps below an exact boundary.
     const nextProcedure =
-      elapsedSeconds < gridStartsAt
+      elapsedSeconds + 1e-9 < gridStartsAt
         ? 'formation'
         : snapshot.formationBehindSafetyCar
           ? 'racing'
-        : elapsedSeconds < lightsStartAt
+        : elapsedSeconds + 1e-9 < lightsStartAt
           ? 'grid'
-          : elapsedSeconds < raceStartsAt
+          : elapsedSeconds + 1e-9 < raceStartsAt
             ? 'lights'
             : 'racing'
     const phaseEndsAt =
@@ -3414,7 +3415,7 @@ export function advanceRace(
     const completedFormationLaps = Math.min(
       snapshot.formationLapsPlanned,
       Math.floor(
-        elapsedSeconds / Math.max(1, snapshot.formationLapDurationSeconds),
+        (elapsedSeconds + 1e-9) / Math.max(1, snapshot.formationLapDurationSeconds),
       ),
     )
     const phaseMessage =
@@ -3636,7 +3637,7 @@ export function advanceRace(
 
       const formationProgress = Math.min(
         snapshot.formationLapsPlanned,
-        elapsedSeconds / Math.max(1, snapshot.formationLapDurationSeconds),
+        (elapsedSeconds + 1e-9) / Math.max(1, snapshot.formationLapDurationSeconds),
       )
       const formationDistance =
         startingGridDistance(index, config.track.lengthKm * 1000) +
