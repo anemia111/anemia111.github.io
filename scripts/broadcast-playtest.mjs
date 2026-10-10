@@ -562,6 +562,25 @@ async function runViewport(browser, name, viewport, screenshotPath) {
   }
   await page.getByRole('button', { name: '1x' }).click()
 
+  await page.getByRole('tab', { name: 'DECISIONS', exact: true }).click()
+  await page.waitForFunction(() => Array.from(document.querySelectorAll('.pit-wall-decision')).some((entry) => entry.textContent.includes('Manual box instruction')), null, { timeout: 8000 })
+  const decisionEvidence = await page.locator('.pit-wall-decision').allTextContents()
+  if (!decisionEvidence.some((entry) => entry.includes('Predicted rejoin') && entry.includes('Actual rejoin'))) {
+    throw new Error('Executed box instruction has no prediction / outcome evidence')
+  }
+  await page.screenshot({ path: join(artifactDirectory, `pit-wall-decisions-${name}.png`), fullPage: true })
+  await page.getByRole('tab', { name: 'TEAM', exact: true }).click()
+  const teamCards = page.locator('.pit-wall-team-car')
+  if (await teamCards.count() !== 2) throw new Error('F1 team operations must expose both cars')
+  const teammateCard = teamCards.filter({ hasText: /RUNNING/u }).first()
+  const teammateIdentity = await teammateCard.getAttribute('aria-label')
+  await teammateCard.getByRole('button', { name: 'SAVE', exact: true }).click()
+  await page.waitForFunction((identity) => {
+    const card = Array.from(document.querySelectorAll('.pit-wall-team-car')).find((entry) => entry.getAttribute('aria-label') === identity)
+    return Array.from(card?.querySelectorAll('button[aria-pressed="true"]') ?? []).some((button) => button.textContent === 'SAVE')
+  }, teammateIdentity, { timeout: 8000 })
+  await page.screenshot({ path: join(artifactDirectory, `pit-wall-team-${name}.png`), fullPage: true })
+
   const pitWallLayout = await page.evaluate(() => {
     const panel = document.querySelector('.pit-wall-panel')
     const body = document.querySelector('.pit-wall-body')
@@ -1258,7 +1277,7 @@ try {
     if (result.pitWallInitialFocus !== 'Close pit wall') failures.push(`pit wall did not take keyboard focus: ${result.pitWallInitialFocus}`)
     if (!result.pitWallHeader.includes(result.pitWallSelectedCode)) failures.push(`pit wall header does not identify the selected car ${result.pitWallSelectedCode}: ${result.pitWallHeader}`)
     if (!/RACE\s*\/\s*LAP\s+\d+\s+OF\s+\d+/u.test(result.pitWallHeader)) failures.push(`pit wall header is missing the session and lap count: ${result.pitWallHeader}`)
-    const expectedPitWallTabs = ['OVERVIEW', 'LAP LOG', 'STRATEGY', 'CAR SYSTEMS', 'WEATHER & TRACK', 'RACE CONTROL']
+    const expectedPitWallTabs = ['OVERVIEW', 'LAP LOG', 'STRATEGY', 'CAR SYSTEMS', 'WEATHER & TRACK', 'TEAM', 'DECISIONS', 'RACE CONTROL']
     if (result.pitWallTabViews.map((tab) => tab.label).join('|') !== expectedPitWallTabs.join('|')) failures.push(`pit wall tabs are wrong: ${result.pitWallTabViews.map((tab) => tab.label).join(', ')}`)
     for (const tab of result.pitWallTabViews) {
       if (tab.selected !== 'true') failures.push(`pit wall tab ${tab.label} did not become the selected tab`)

@@ -1439,6 +1439,8 @@ export type CarSnapshot = {
 }
 
 export type RaceSnapshot = {
+  /** Bounded SIM pit-decision evidence, optional for older checkpoints. */
+  strategyDecisions?: import('./simulation/decisionLog').StrategyDecision[]
   elapsedSeconds: number
   elapsedLabel: string
   leaderLap: number

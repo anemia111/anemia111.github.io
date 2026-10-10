@@ -1,4 +1,5 @@
 import { phaseOneConfig } from '../data/phaseOne'
+import { MAX_STRATEGY_DECISIONS, settleStrategyDecisions, type StrategyDecision } from './decisionLog'
 import {
   START_LIGHT_BUILD_SECONDS,
   START_LIGHT_MAXIMUM_HOLD_SECONDS,
@@ -3155,6 +3156,7 @@ export function advanceRace(
   const driverObservationTick = driverObservationTickAt(elapsedSeconds)
   const f1WeatherRules = categoryPhysics.id === 'f1-custom'
   const newEvents: RaceEvent[] = []
+  const newStrategyDecisions: StrategyDecision[] = []
   const weather = weatherFor(config.seed, config.track, elapsedSeconds)
   const trackGrip = trackGripForWeather(config.seed, config.track, elapsedSeconds)
   const weatherForecast = weatherForecastFor(config.seed, config.track, elapsedSeconds)
@@ -8419,6 +8421,21 @@ export function advanceRace(
               modeledPitLaneLossSeconds,
             )
         const doubleStackRisk = !servesProceduralPenalty && teammateInPit
+        newStrategyDecisions.push({
+          id: `pit-decision-${driver.id}-${lap}-${elapsedSeconds}`,
+          driverId: driver.id,
+          teamId: next.teamId,
+          elapsedSeconds,
+          lap,
+          reason: decision.reason,
+          compound: decision.compound,
+          positionBefore: next.position,
+          projectedRejoinPosition,
+          estimatedLossSeconds: servesProceduralPenalty ? baseLoss : estimatedStopLoss,
+          doubleStackRisk,
+          outcome: null,
+          interrupted: false,
+        })
         const pitExitGapSeconds = snapshot.cars
           .filter(
             (candidate) =>
@@ -9244,6 +9261,13 @@ export function advanceRace(
   )
 
   const nextSnapshot: RaceSnapshot = {
+    strategyDecisions: settleStrategyDecisions(
+      newStrategyDecisions.length > 0
+        ? [...(snapshot.strategyDecisions ?? []), ...newStrategyDecisions].slice(-MAX_STRATEGY_DECISIONS)
+        : snapshot.strategyDecisions ?? [],
+      classifiedCars,
+      elapsedSeconds,
+    ),
     elapsedSeconds,
     elapsedLabel: formatElapsed(elapsedSeconds),
     leaderLap,

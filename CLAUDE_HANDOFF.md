@@ -220,6 +220,17 @@ driving game.
 
 ## 3D And UI
 
+- Phase 2 foundation adds TEAM and DECISIONS to the existing pit-wall overlay.
+  TEAM handles the actual number of same-team entrants (including Free Mode),
+  with named per-car commands using the existing eligibility checks. F1 pit
+  decisions are recorded at execution in `src/simulation/decisionLog.ts`,
+  settled on the first ranked snapshot after physical pit exit, and restored
+  through the bounded checkpoint parser. Invalid optional logs are discarded
+  without rejecting an otherwise valid race. Predicted pit loss is the engine
+  estimate at the call; actual call-to-exit elapsed time is a separate quantity.
+  Neither rejoin position nor elapsed service time is labelled net strategy gain.
+  No alternative-future simulation or expanded SF pit model is implemented yet.
+
 - `RaceScene` is lazy-loaded and uses lightweight Three.js primitives for cars, track, kerbs,
   runoff, barriers, pit lane/boxes, grid slots, corner numbers, marshal posts,
   DRS markers, and safety-car lines.

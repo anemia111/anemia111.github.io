@@ -4103,6 +4103,17 @@ describe('manual strategy request', () => {
     expect(car.pitStops).toBeGreaterThanOrEqual(1)
     expect(f1Tires(car).pendingTire === 'H' || f1Tires(car).tire === 'H').toBe(true)
     expect(car.lapHistory.some((lap) => lap.pitStop)).toBe(true)
+    const call = snapshot.strategyDecisions?.find((d) => d.driverId === initialDrivers[0].id && d.reason === 'manual')
+    expect(call).toMatchObject({ compound: 'H', driverId: initialDrivers[0].id })
+    expect(call!.projectedRejoinPosition).toBeGreaterThanOrEqual(1)
+    const recorded = structuredClone(call!)
+    snapshot = advanceRace(snapshot, 90, config, requests)
+    snapshot = advanceRace(snapshot, 5, config, requests)
+    const settled = snapshot.strategyDecisions!.find((d) => d.id === recorded.id)!
+    expect(settled.outcome).not.toBeNull()
+    expect(settled.outcome!.elapsedSeconds).toBeGreaterThan(recorded.elapsedSeconds)
+    expect({ ...settled, outcome: null }).toEqual({ ...recorded, outcome: null })
+    expect(call).toEqual(recorded)
   })
 
   it('applies a driver pace instruction to live wear and state', () => {

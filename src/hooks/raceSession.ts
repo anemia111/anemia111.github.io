@@ -6,6 +6,7 @@ import type {
   RechargeRuleDefinition,
   Team,
 } from '../types'
+import { parseStrategyDecisions } from '../simulation/decisionLog'
 import {
   activeAeroDisplayModeForState,
   createInitialActiveAeroState,
@@ -1295,6 +1296,7 @@ function migrateRaceSnapshot(
 
   return {
     ...value,
+    strategyDecisions: parseStrategyDecisions(value.strategyDecisions, value),
     cars: value.cars.map((car) => {
       const persisted = car as CarSnapshot &
         Partial<

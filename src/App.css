@@ -2333,6 +2333,60 @@
   border-bottom: 0;
 }
 
+.pit-wall-tabs button:last-child {
+  grid-column: span 2;
+}
+
+.pit-wall-note {
+  margin: 8px 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.pit-wall-team, .pit-wall-decision-log {
+  display: grid;
+  gap: 12px;
+}
+
+.pit-wall-team-car, .pit-wall-decision {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.pit-wall-team-car h3, .pit-wall-decision h3 {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 0 0 10px;
+  font-size: 11px;
+}
+
+.pit-wall-team-car h3 span { color: var(--text-muted); }
+.pit-wall-decision p { font-size: 11px; }
+.pit-wall-decision dl { margin: 0; font-size: 11px; }
+.pit-wall-decision dl > div { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; }
+.pit-wall-decision dt { color: var(--text-muted); }
+.pit-wall-decision dd { margin: 0; }
+
+.pit-wall-team-actions { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+.pit-wall-team-actions button {
+  padding: 6px 8px;
+  border: 1px solid var(--panel-border);
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-main);
+  font: inherit;
+  font-size: 10px;
+  cursor: pointer;
+}
+.pit-wall-team-actions button[aria-pressed='true'] { background: rgba(75, 216, 255, 0.2); }
+.pit-wall-team-actions button:disabled { opacity: 0.4; cursor: default; }
+
 .pit-wall-tabs button[aria-selected='true'] {
   color: #e9fbff;
   background: rgba(75, 216, 255, 0.16);
