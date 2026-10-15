@@ -1,0 +1,200 @@
+[
+  {
+    "id": "alpine",
+    "sourceTexture": "T_Alpine2024_livery_basecolor.png",
+    "sourceTeamPath": "Alpine",
+    "sourcePNG_SHA256": "f3550b9f8d39498eb6cad3e40bb71dd9323e122da5c9481fad6d4b55f1bb6383",
+    "output": "alpine.webp",
+    "outputSHA256": "5ae61b6ca5bb0ead1cc4c6e37c6978289611f33f379a58226a27c388b5d94cdd",
+    "sourceDimensions": [
+      4096,
+      4096
+    ],
+    "outputDimensions": [
+      1024,
+      1024
+    ],
+    "provenance": "user-supplied F1 Manager 2024 livery mod; separate from Apache-2.0 model",
+    "mapping": "approximate part-specific projection; not original UV layout"
+  },
+  {
+    "id": "aston-martin",
+    "sourceTexture": "T_AstonMartin2024_livery_basecolor.png",
+    "sourceTeamPath": "AstonMartin",
+    "sourcePNG_SHA256": "0f2da494d95e60227f238fca635341e58f0de06bc3fdfe915291a1795f4bd729",
+    "output": "aston-martin.webp",
+    "outputSHA256": "f38d299c02f83eb7a7d1a0fe2c813dd00808f74994c41c1e53899b5a9171e407",
+    "sourceDimensions": [
+      4096,
+      4096
+    ],
+    "outputDimensions": [
+      1024,
+      1024
+    ],
+    "provenance": "user-supplied F1 Manager 2024 livery mod; separate from Apache-2.0 model",
+    "mapping": "approximate part-specific projection; not original UV layout"
+  },
+  {
+    "id": "ferrari",
+    "sourceTexture": "T_Ferrari2024_livery_basecolor.png",
+    "sourceTeamPath": "Ferrari",
+    "sourcePNG_SHA256": "8eca58f079ff01ffd8dd8369d0801203e5956f7362c8d6c206b93368ccb807b2",
+    "output": "ferrari.webp",
+    "outputSHA256": "390247bca214b2943c8c3be085820222b76a1c75d3de83a0601fa47f0d569540",
+    "sourceDimensions": [
+      4096,
+      4096
+    ],
+    "outputDimensions": [
+      1024,
+      1024
+    ],
+    "provenance": "user-supplied F1 Manager 2024 livery mod; separate from Apache-2.0 model",
+    "mapping": "approximate part-specific projection; not original UV layout"
+  },
+  {
+    "id": "haas",
+    "sourceTexture": "T_Haas2024_livery_basecolor.png",
+    "sourceTeamPath": "Haas",
+    "sourcePNG_SHA256": "52f1c532b84812112b2da123413cc0926c4f08969004e16dca6ba4c35bcbaee5",
+    "output": "haas.webp",
+    "outputSHA256": "b7a377ce6788deba8994bfba38d29e4a83c189ea1e8c7c0099e76504eb66c359",
+    "sourceDimensions": [
+      4096,
+      4096
+    ],
+    "outputDimensions": [
+      1024,
+      1024
+    ],
+    "provenance": "user-supplied F1 Manager 2024 livery mod; separate from Apache-2.0 model",
+    "mapping": "approximate part-specific projection; not original UV layout"
+  },
+  {
+    "id": "mclaren",
+    "sourceTexture": "T_McLaren2024_livery_basecolor.png",
+    "sourceTeamPath": "McLaren",
+    "sourcePNG_SHA256": "8fbb7a1c1aa977baeb68ba38c5c4ccc5518ccfe7feea250db1f3eed1c28d4f56",
+    "output": "mclaren.webp",
+    "outputSHA256": "82d99297e306f5116037ebc7b972b74075288046f5848c7a740da440d1f2e721",
+    "sourceDimensions": [
+      4096,
+      4096
+    ],
+    "outputDimensions": [
+      1024,
+      1024
+    ],
+    "provenance": "user-supplied F1 Manager 2024 livery mod; separate from Apache-2.0 model",
+    "mapping": "approximate part-specific projection; not original UV layout"
+  },
+  {
+    "id": "mercedes",
+    "sourceTexture": "T_Mercedes2024_livery_basecolor.png",
+    "sourceTeamPath": "Mercedes",
+    "sourcePNG_SHA256": "d7603ce7611ca5d534b73b58cbe00a962da0b390f92dac29151e82a67ab6be07",
+    "output": "mercedes.webp",
+    "outputSHA256": "c7cd4ecfaabc7a385f3f660619207e295ab5fa83fd558932cb1964e886dd01de",
+    "sourceDimensions": [
+      4096,
+      4096
+    ],
+    "outputDimensions": [
+      1024,
+      1024
+    ],
+    "provenance": "user-supplied F1 Manager 2024 livery mod; separate from Apache-2.0 model",
+    "mapping": "approximate part-specific projection; not original UV layout"
+  },
+  {
+    "id": "vcarb",
+    "sourceTexture": "T_RacingBulls2024_livery_basecolor.png",
+    "sourceTeamPath": "RacingBulls",
+    "sourcePNG_SHA256": "3a3f21bb1e9230a6c21a8c6d6f99205db4b7e96140fb7e12220d6682c92909b0",
+    "output": "vcarb.webp",
+    "outputSHA256": "f6bb1f944e80bb4aee5045558da91137f20344a595e5755aaecd3806ddca311e",
+    "sourceDimensions": [
+      4096,
+      4096
+    ],
+    "outputDimensions": [
+      1024,
+      1024
+    ],
+    "provenance": "user-supplied F1 Manager 2024 livery mod; separate from Apache-2.0 model",
+    "mapping": "approximate part-specific projection; not original UV layout"
+  },
+  {
+    "id": "red-bull",
+    "sourceTexture": "T_RedBull2024_livery_basecolor.png",
+    "sourceTeamPath": "RedBull",
+    "sourcePNG_SHA256": "d371ff3cb2a5235f4805d5be0886fefa45a57995b66a41374fb0b95deff9dd5b",
+    "output": "red-bull.webp",
+    "outputSHA256": "9516178dc6e8bd07b055e6c0b761a5bd3b1eb7b94afb1f5e0edb214b21900511",
+    "sourceDimensions": [
+      4096,
+      4096
+    ],
+    "outputDimensions": [
+      1024,
+      1024
+    ],
+    "provenance": "user-supplied F1 Manager 2024 livery mod; separate from Apache-2.0 model",
+    "mapping": "approximate part-specific projection; not original UV layout"
+  },
+  {
+    "id": "audi",
+    "sourceTexture": "T_Sauber2024_livery_basecolor.png",
+    "sourceTeamPath": "Sauber",
+    "sourcePNG_SHA256": "45874c356a458b35ccf772f2e633e65ac37f7c6c4b50eb10677e25b8d32769d7",
+    "output": "audi.webp",
+    "outputSHA256": "4c21e2b6d182b64fc69b84f241fe2ccb93902cbd6fff4cd5e692b25ab3ac6e04",
+    "sourceDimensions": [
+      4096,
+      4096
+    ],
+    "outputDimensions": [
+      1024,
+      1024
+    ],
+    "provenance": "user-supplied F1 Manager 2024 livery mod; separate from Apache-2.0 model",
+    "mapping": "approximate part-specific projection; not original UV layout"
+  },
+  {
+    "id": "williams",
+    "sourceTexture": "T_Williams2024_Livery_basecolor.png",
+    "sourceTeamPath": "Williams",
+    "sourcePNG_SHA256": "59151ed17446d783bc787772afcb516e583cc95e5abce4b94f13b1137140a399",
+    "output": "williams.webp",
+    "outputSHA256": "74445284160099c21e3b9aa4f319f43c6d7ad66a222ac307060d20c27dadcbae",
+    "sourceDimensions": [
+      4096,
+      4096
+    ],
+    "outputDimensions": [
+      1024,
+      1024
+    ],
+    "provenance": "user-supplied F1 Manager 2024 livery mod; separate from Apache-2.0 model",
+    "mapping": "approximate part-specific projection; not original UV layout"
+  },
+  {
+    "id": "cadillac",
+    "sourceTexture": "T_livery27_overlay_basecolor.png",
+    "sourceTeamPath": "MyTeam",
+    "sourcePNG_SHA256": "9f3b8712e3de9dbfb85669f3f36d0bca31227dd3d0a31d46e3c8bcfebea9b43c",
+    "output": "cadillac.webp",
+    "outputSHA256": "c190ff966692d5b1b269af7e7bbf218b93576c285e82280c8ffee73b04fe0365",
+    "sourceDimensions": [
+      4096,
+      4096
+    ],
+    "outputDimensions": [
+      1024,
+      1024
+    ],
+    "provenance": "user-supplied F1 Manager 2024 livery mod; separate from Apache-2.0 model",
+    "mapping": "approximate part-specific projection; not original UV layout"
+  }
+]
