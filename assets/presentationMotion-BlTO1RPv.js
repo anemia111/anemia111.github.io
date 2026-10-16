@@ -1,1 +1,0 @@
-function e(e,t){return e.distanceM+(t.phase===`formation`?t.formationSeconds*80/3.6:0)}export{e as t};
