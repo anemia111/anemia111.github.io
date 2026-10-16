@@ -78,6 +78,87 @@
       "bytes": 732312,
       "confidence": "independent 2026 concept; not team CAD or final-regulation certification",
       "changes": "LOD simplification, metre/axis normalization, aero separation, rig pivots, static merging, runtime palette, Meshopt compression; see qvist-attribution.txt"
+    },
+    {
+      "file": "vegetation.glb",
+      "source": "https://github.com/dgreenheck/ez-tree",
+      "generator": "@dgreenheck/ez-tree@1.1.0",
+      "license": "MIT",
+      "creator": "Daniel Greenheck",
+      "acquiredAt": "2026-10-17",
+      "sha256": "cba639f495845f4bbf754d6674192d442b08c3e03139fd183058839dba8908e0",
+      "bytes": 794996,
+      "confidence": "Generic generated vegetation; estimated placement, not measured Suzuka trees",
+      "changes": "Metric normalization, geometry budget, LOD simplification and Meshopt compression"
+    },
+    {
+      "file": "leaf-ash.png",
+      "source": "https://github.com/dgreenheck/ez-tree",
+      "generator": "@dgreenheck/ez-tree@1.1.0",
+      "license": "MIT",
+      "creator": "Daniel Greenheck",
+      "acquiredAt": "2026-10-17",
+      "sha256": "5ec987db3829a839856c32c79b18a33a78f209e911cad55c65abfb77f30e2d29",
+      "bytes": 181423,
+      "confidence": "Generic generated vegetation; estimated placement, not measured Suzuka trees",
+      "changes": "Original bundled leaf RGBA texture; unmodified"
+    },
+    {
+      "file": "leaf-oak.png",
+      "source": "https://github.com/dgreenheck/ez-tree",
+      "generator": "@dgreenheck/ez-tree@1.1.0",
+      "license": "MIT",
+      "creator": "Daniel Greenheck",
+      "acquiredAt": "2026-10-17",
+      "sha256": "24451223cf396d22910a4932b8bb996a7274e63d81e24128c96a430ab67822b1",
+      "bytes": 238115,
+      "confidence": "Generic generated vegetation; estimated placement, not measured Suzuka trees",
+      "changes": "Original bundled leaf RGBA texture; unmodified"
+    },
+    {
+      "file": "leaf-pine.png",
+      "source": "https://github.com/dgreenheck/ez-tree",
+      "generator": "@dgreenheck/ez-tree@1.1.0",
+      "license": "MIT",
+      "creator": "Daniel Greenheck",
+      "acquiredAt": "2026-10-17",
+      "sha256": "88be36a2387554ac4b7c7d1549eae454a37ad896e8e33a7d6ae5956bd169ab08",
+      "bytes": 303684,
+      "confidence": "Generic generated vegetation; estimated placement, not measured Suzuka trees",
+      "changes": "Original bundled leaf RGBA texture; unmodified"
+    },
+    {
+      "file": "tree-ash-impostor.png",
+      "source": "https://github.com/dgreenheck/ez-tree",
+      "license": "MIT",
+      "creator": "Daniel Greenheck; render derived by this project",
+      "acquiredAt": "2026-10-17",
+      "sha256": "1050cd08775532e2852c9a470bd0c5837b16d8e087d38240e3786a59ca879fa3",
+      "bytes": 132066,
+      "confidence": "Generic generated tree, not Suzuka survey",
+      "changes": "512px neutral-light orthographic render of near tree for distant camera-facing impostor. 20m square framing; billboard centre 7m above root."
+    },
+    {
+      "file": "tree-oak-impostor.png",
+      "source": "https://github.com/dgreenheck/ez-tree",
+      "license": "MIT",
+      "creator": "Daniel Greenheck; render derived by this project",
+      "acquiredAt": "2026-10-17",
+      "sha256": "bf698a81cd74699a5e1e76c91ecb2b02bf28cbcc5e739c9ee89bd4ab71232f45",
+      "bytes": 140541,
+      "confidence": "Generic generated tree, not Suzuka survey",
+      "changes": "512px neutral-light orthographic render of near tree for distant camera-facing impostor. 20m square framing; billboard centre 7m above root."
+    },
+    {
+      "file": "tree-pine-impostor.png",
+      "source": "https://github.com/dgreenheck/ez-tree",
+      "license": "MIT",
+      "creator": "Daniel Greenheck; render derived by this project",
+      "acquiredAt": "2026-10-17",
+      "sha256": "2b388a3c6fe9c3ce702bf9d05be37f82d49e84e9832cac18f344035333f253be",
+      "bytes": 62030,
+      "confidence": "Generic generated tree, not Suzuka survey",
+      "changes": "512px neutral-light orthographic render of near tree for distant camera-facing impostor. 20m square framing; billboard centre 7m above root."
     }
   ],
   "road": {
